@@ -27,7 +27,6 @@ namespace DTech.LinkGuard.Editor
         private VisualElement _previewHost;
         private ToolbarToggle _previewToggle;
         private ToolbarButton _generateButton;
-        private Button _updatePreviewButton;
         private Label _footerLabel;
         private bool _showPreview;
         private bool _previewDirty;
@@ -93,7 +92,6 @@ namespace DTech.LinkGuard.Editor
             Label emptyHint = root.Q<Label>("empty-hint");
 
             _footerLabel = root.Q<Label>("footer-label");
-            _updatePreviewButton = root.Q<Button>("btn-update-preview");
 
             _treeController = new AssemblyTreeController(treeView, emptyHint)
             {
@@ -109,7 +107,6 @@ namespace DTech.LinkGuard.Editor
             saveBtn.clicked += SaveProfileClickedHandler;
             mergeBtn.clicked += MergeLinkXmlClickedHandler;
             _generateButton.clicked += Generate;
-            _updatePreviewButton.clicked += RebuildPreview;
 
             searchField.RegisterValueChangedCallback(SearchChangedHandler);
             _previewToggle.RegisterValueChangedCallback(PreviewToggleChangedHandler);
@@ -342,11 +339,16 @@ namespace DTech.LinkGuard.Editor
             int selectedTypes = _entries.Sum(e => e.SelectedTypeCount);
             int selectedMethods = _entries.Sum(e => e.SelectedMethodCount);
 
-            _footerLabel.text =
-                $"Assemblies: {total}    Selected: {selectedAssemblies} assemblies, {selectedTypes} types, {selectedMethods} methods    Target: {LinkXmlWriter.DefaultPath}";
+            _footerLabel.text = $"Assemblies: {total}    " +
+                $"Selected: {selectedAssemblies} assemblies, {selectedTypes} types, {selectedMethods} methods    " +
+                $"Target: {LinkXmlWriter.DefaultPath}";
 
-            bool showUpdate = _showPreview && _previewDirty && _entries.Count > 0;
-            _updatePreviewButton.style.display = showUpdate ? DisplayStyle.Flex : DisplayStyle.None;
+            bool needUpdatePreview = _showPreview && _previewDirty && _entries.Count > 0;
+            if (needUpdatePreview)
+            {
+                RebuildPreview();
+            }
+            
             _generateButton.SetEnabled(HasAnySelection());
         }
 
