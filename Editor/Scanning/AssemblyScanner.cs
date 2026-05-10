@@ -11,7 +11,7 @@ using CompilationAssembly = UnityEditor.Compilation.Assembly;
 
 namespace DTech.LinkGuard.Editor
 {
-    public static class AssemblyScanner
+    internal static class AssemblyScanner
     {
         public static List<AssemblyEntry> Scan()
         {
@@ -25,6 +25,7 @@ namespace DTech.LinkGuard.Editor
 
             List<AssemblyEntry> result = new List<AssemblyEntry>(compilationAssemblies.Length);
 
+            var sdks = new KnownSdks();
             foreach (CompilationAssembly assembly in compilationAssemblies)
             {
                 if (SystemAssemblyFilter.ShouldExclude(assembly.name))
@@ -32,7 +33,7 @@ namespace DTech.LinkGuard.Editor
                     continue;
                 }
 
-                AssemblySource source = ResolveSource(assembly);
+                AssemblySource source = ResolveSource(sdks, assembly);
                 ResolveTypes(assembly, loadedByName, out HashSet<string> namespaces, out HashSet<string> globalTypes);
                 string originPath = ResolveOriginPath(assembly);
 
@@ -49,9 +50,9 @@ namespace DTech.LinkGuard.Editor
             return result;
         }
 
-        private static AssemblySource ResolveSource(CompilationAssembly assembly)
+        private static AssemblySource ResolveSource(KnownSdks sdks, CompilationAssembly assembly)
         {
-            if (KnownSdks.IsSdk(assembly.name))
+            if (sdks.IsSdk(assembly.name))
             {
                 return AssemblySource.Sdk;
             }

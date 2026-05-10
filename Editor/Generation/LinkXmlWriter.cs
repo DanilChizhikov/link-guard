@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace DTech.LinkGuard.Editor
 {
-    public static class LinkXmlWriter
+    internal static class LinkXmlWriter
     {
         public const string DefaultPath = "Assets/link.xml";
 

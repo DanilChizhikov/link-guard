@@ -2,7 +2,7 @@ using System;
 
 namespace DTech.LinkGuard.Editor
 {
-    public static class SystemAssemblyFilter
+    internal static class SystemAssemblyFilter
     {
         private static readonly string[] _excludedPrefixes =
         {

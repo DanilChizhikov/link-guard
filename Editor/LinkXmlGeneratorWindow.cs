@@ -7,7 +7,7 @@ using UnityEngine.UIElements;
 
 namespace DTech.LinkGuard.Editor
 {
-    public class LinkXmlGeneratorWindow : EditorWindow
+    internal sealed class LinkXmlGeneratorWindow : EditorWindow
     {
         private const string MenuPath = "Window/DTech/" + Title;
         private const string UxmlName = "LinkXmlGeneratorWindow";

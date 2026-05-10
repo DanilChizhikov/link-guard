@@ -8,7 +8,7 @@ using System.Xml.Linq;
 
 namespace DTech.LinkGuard.Editor
 {
-    public static class LinkXmlBuilder
+    internal static class LinkXmlBuilder
     {
         public static string Build(IReadOnlyList<AssemblyEntry> entries)
         {

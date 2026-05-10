@@ -5,7 +5,7 @@ using UnityEngine.UIElements;
 
 namespace DTech.LinkGuard.Editor
 {
-    public class AssemblyTreeController
+    internal sealed class AssemblyTreeController
     {
         public Action OnChanged;
         

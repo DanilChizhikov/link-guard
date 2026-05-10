@@ -4,7 +4,7 @@ using UnityEngine.UIElements;
 
 namespace DTech.LinkGuard.Editor
 {
-    public class PreviewPanel
+    internal sealed class PreviewPanel
     {
         public bool HasContent => !string.IsNullOrEmpty(_xml);
         

@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace DTech.LinkGuard.Editor
 {
-    public static class LinkXmlProfileStorage
+    internal static class LinkXmlProfileStorage
     {
         private const string DefaultDirectory = "ProjectSettings";
         private const string DefaultFileName = "LinkXmlProfile.json";

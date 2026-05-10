@@ -3,7 +3,7 @@ using System.Linq;
 
 namespace DTech.LinkGuard.Editor
 {
-    public class AssemblyEntry
+    internal sealed class AssemblyEntry
     {
         public string Name { get; }
         public AssemblySource Source { get; }

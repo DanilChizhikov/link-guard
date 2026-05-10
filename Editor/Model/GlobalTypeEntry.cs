@@ -1,6 +1,6 @@
 namespace DTech.LinkGuard.Editor
 {
-    public class GlobalTypeEntry
+    internal sealed class GlobalTypeEntry
     {
         public string Fullname { get; }
         public bool IsSelected { get; set; }
