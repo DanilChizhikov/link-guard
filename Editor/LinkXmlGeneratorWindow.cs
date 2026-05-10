@@ -238,6 +238,12 @@ namespace DTech.LinkGuard.Editor
             }
 
             _treeController.Rebuild();
+            if (_showPreview)
+            {
+                RebuildPreview();
+                return;
+            }
+
             MarkPreviewDirty();
         }
 
