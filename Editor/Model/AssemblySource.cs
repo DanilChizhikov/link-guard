@@ -1,6 +1,6 @@
 namespace DTech.LinkGuard.Editor
 {
-    public enum AssemblySource : byte
+    internal enum AssemblySource : byte
     {
         Project = 0,
         Plugin = 1,

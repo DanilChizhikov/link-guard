@@ -1,6 +1,6 @@
 namespace DTech.LinkGuard.Editor
 {
-    public class AssemblyTreeNode
+    internal sealed class AssemblyTreeNode
     {
         public AssemblyTreeNodeKind Kind { get; }
         public AssemblySource Group { get; }

@@ -1,10 +1,14 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
+using UnityEditor;
 
 namespace DTech.LinkGuard.Editor
 {
-    public static class KnownSdks
+    internal sealed class KnownSdks
     {
-        private static readonly Regex[] _sdkPatterns =
+        private static readonly Regex[] _backedSdkPatterns =
         {
             new(@"^Firebase(\..+)?$", RegexOptions.Compiled),
             new(@"^MaxSdk(\..+)?$", RegexOptions.Compiled),
@@ -25,13 +29,22 @@ namespace DTech.LinkGuard.Editor
             new(@"^StompyRobot(\..+)?$", RegexOptions.Compiled)
         };
 
-        public static bool IsSdk(string assemblyName)
+        private readonly List<Regex> _sdkPatterns;
+
+        public KnownSdks()
+        {
+            _sdkPatterns = new List<Regex>(_backedSdkPatterns);
+            Regex[] customPatterns = GetCustomPatterns();
+            _sdkPatterns.AddRange(customPatterns);
+        }
+
+        public bool IsSdk(string assemblyName)
         {
             if (string.IsNullOrEmpty(assemblyName))
             {
                 return false;
             }
-
+            
             foreach (Regex pattern in _sdkPatterns)
             {
                 if (pattern.IsMatch(assemblyName))
@@ -41,6 +54,25 @@ namespace DTech.LinkGuard.Editor
             }
 
             return false;
+        }
+
+        private static Regex[] GetCustomPatterns()
+        {
+            var result = new List<Regex>();
+            TypeCache.TypeCollection collection = TypeCache.GetTypesDerivedFrom<IKnownSdkProvider>();
+            Type[] types = collection.Where(t => !t.IsAbstract && !t.IsInterface).ToArray();
+            foreach (Type type in types)
+            {
+                if (type == null)
+                {
+                    continue;
+                }
+
+                var provider = (IKnownSdkProvider)Activator.CreateInstance(type);
+                result.AddRange(provider.GetSdkPatterns());
+            }
+
+            return result.ToArray();
         }
     }
 }

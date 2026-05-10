@@ -1,7 +1,7 @@
 {
   "name": "com.dtech.linkguard.editor",
   "rootNamespace": "DTech",
-  "references": [],
+  "references": ["GUID:b8a7efa7351d4c38ad2f57a043110a9a"],
   "includePlatforms": [
     "Editor"
   ],

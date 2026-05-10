@@ -1,6 +1,6 @@
 namespace DTech.LinkGuard.Editor
 {
-    public class NamespaceEntry
+    internal sealed class NamespaceEntry
     {
         public string Fullname { get; }
         public bool IsSelected { get; set; }
