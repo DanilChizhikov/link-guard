@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.UIElements;
@@ -14,6 +15,7 @@ namespace DTech.LinkGuard.Editor
         private const string USSName = "LinkXmlGeneratorWindow";
         private const string ShowPreviewKey = "LinkXmlGenerator.ShowPreview";
         private const string SplitPxKey = "LinkXmlGenerator.SplitPx";
+        private const string LastProfilePathKey = "LinkXmlGenerator.LastProfilePath";
         private const string Title = "Link XML Generator";
         private const float DefaultPreviewHeight = 220f;
 
@@ -145,10 +147,13 @@ namespace DTech.LinkGuard.Editor
         {
             try
             {
-                EditorUtility.DisplayProgressBar(Title, "Scanning assemblies...", 0.3f);
-                _entries = AssemblyScanner.Scan();
+                _entries = AssemblyScanner.Scan((message, progress) =>
+                    EditorUtility.DisplayProgressBar(Title, message, progress));
                 _treeController.SetEntries(_entries);
-                MarkPreviewDirty();
+                if (!TryLoadLastProfile())
+                {
+                    MarkPreviewDirty();
+                }
             }
             finally
             {
@@ -194,6 +199,43 @@ namespace DTech.LinkGuard.Editor
             return _entries.Any(e => e.ProducesEntry);
         }
 
+        private bool TryLoadLastProfile()
+        {
+            string path = EditorPrefs.GetString(LastProfilePathKey, string.Empty);
+
+            if (string.IsNullOrEmpty(path))
+            {
+                return false;
+            }
+
+            if (!File.Exists(path))
+            {
+                EditorPrefs.DeleteKey(LastProfilePathKey);
+                return false;
+            }
+
+            if (!LinkXmlProfileStorage.Load(_entries, path, false))
+            {
+                return false;
+            }
+
+            _treeController.Rebuild();
+            UpdateLoadedProfileState();
+
+            return true;
+        }
+
+        private void UpdateLoadedProfileState()
+        {
+            if (_showPreview)
+            {
+                RebuildPreview();
+                return;
+            }
+
+            MarkPreviewDirty();
+        }
+
         private void UpdateFooter()
         {
             int total = _entries.Count;
@@ -235,24 +277,22 @@ namespace DTech.LinkGuard.Editor
 
         private void LoadProfileClickedHandler()
         {
-            if (!LinkXmlProfileStorage.Load(_entries))
+            if (!LinkXmlProfileStorage.Load(_entries, out string path))
             {
                 return;
             }
 
+            EditorPrefs.SetString(LastProfilePathKey, path);
             _treeController.Rebuild();
-            if (_showPreview)
-            {
-                RebuildPreview();
-                return;
-            }
-
-            MarkPreviewDirty();
+            UpdateLoadedProfileState();
         }
 
         private void SaveProfileClickedHandler()
         {
-            LinkXmlProfileStorage.Save(_entries);
+            if (LinkXmlProfileStorage.Save(_entries, out string path))
+            {
+                EditorPrefs.SetString(LastProfilePathKey, path);
+            }
         }
 
         private void SearchChangedHandler(ChangeEvent<string> evt)
