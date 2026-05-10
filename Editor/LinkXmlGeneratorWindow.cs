@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
@@ -14,6 +16,7 @@ namespace DTech.LinkGuard.Editor
         private const string USSName = "LinkXmlGeneratorWindow";
         private const string ShowPreviewKey = "LinkXmlGenerator.ShowPreview";
         private const string SplitPxKey = "LinkXmlGenerator.SplitPx";
+        private const string LastProfilePathKey = "LinkXmlGenerator.LastProfilePath";
         private const string Title = "Link XML Generator";
         private const float DefaultPreviewHeight = 220f;
 
@@ -24,7 +27,6 @@ namespace DTech.LinkGuard.Editor
         private VisualElement _previewHost;
         private ToolbarToggle _previewToggle;
         private ToolbarButton _generateButton;
-        private Button _updatePreviewButton;
         private Label _footerLabel;
         private bool _showPreview;
         private bool _previewDirty;
@@ -77,6 +79,7 @@ namespace DTech.LinkGuard.Editor
             ToolbarButton noneBtn = root.Q<ToolbarButton>("btn-none");
             ToolbarButton loadBtn = root.Q<ToolbarButton>("btn-load");
             ToolbarButton saveBtn = root.Q<ToolbarButton>("btn-save");
+            ToolbarButton mergeBtn = root.Q<ToolbarButton>("btn-merge");
             _previewToggle = root.Q<ToolbarToggle>("tgl-preview");
             _generateButton = root.Q<ToolbarButton>("btn-generate");
 
@@ -89,7 +92,6 @@ namespace DTech.LinkGuard.Editor
             Label emptyHint = root.Q<Label>("empty-hint");
 
             _footerLabel = root.Q<Label>("footer-label");
-            _updatePreviewButton = root.Q<Button>("btn-update-preview");
 
             _treeController = new AssemblyTreeController(treeView, emptyHint)
             {
@@ -103,8 +105,8 @@ namespace DTech.LinkGuard.Editor
             noneBtn.clicked += NoneClickedHandler;
             loadBtn.clicked += LoadProfileClickedHandler;
             saveBtn.clicked += SaveProfileClickedHandler;
+            mergeBtn.clicked += MergeLinkXmlClickedHandler;
             _generateButton.clicked += Generate;
-            _updatePreviewButton.clicked += RebuildPreview;
 
             searchField.RegisterValueChangedCallback(SearchChangedHandler);
             _previewToggle.RegisterValueChangedCallback(PreviewToggleChangedHandler);
@@ -145,10 +147,13 @@ namespace DTech.LinkGuard.Editor
         {
             try
             {
-                EditorUtility.DisplayProgressBar(Title, "Scanning assemblies...", 0.3f);
-                _entries = AssemblyScanner.Scan();
+                _entries = AssemblyScanner.Scan((message, progress) =>
+                    EditorUtility.DisplayProgressBar(Title, message, progress));
                 _treeController.SetEntries(_entries);
-                MarkPreviewDirty();
+                if (!TryLoadLastProfile())
+                {
+                    MarkPreviewDirty();
+                }
             }
             finally
             {
@@ -174,6 +179,43 @@ namespace DTech.LinkGuard.Editor
             UpdateFooter();
         }
 
+        private void MergeLinkXmlClickedHandler()
+        {
+            IReadOnlyList<string> paths = LinkXmlMergeScanner.FindLinkXmlFiles();
+
+            if (paths.Count == 0)
+            {
+                EditorUtility.DisplayDialog(Title, "No link.xml files were found in Assets or Packages.", "OK");
+                return;
+            }
+
+            LinkXmlMergeResult result = LinkXmlMerger.Merge(paths);
+            LogSkippedFiles(result);
+
+            if (result.FilesMerged == 0)
+            {
+                EditorUtility.DisplayDialog(Title, BuildMergeReport(result), "OK");
+                return;
+            }
+
+            ShowPreview();
+            _previewPanel.SetXml(result.Xml);
+            _previewDirty = false;
+
+            if (!LinkXmlWriter.WriteWithConfirmation(result.Xml))
+            {
+                UpdateFooter();
+                return;
+            }
+
+            ApplyMergedXmlToTree(result.Xml);
+
+            string report = BuildMergeReport(result);
+            Debug.Log($"[LinkXmlGenerator] {report}");
+            EditorUtility.DisplayDialog(Title, report, "OK");
+            UpdateFooter();
+        }
+
         private void RebuildPreview()
         {
             string xml = LinkXmlBuilder.Build(_entries);
@@ -194,6 +236,102 @@ namespace DTech.LinkGuard.Editor
             return _entries.Any(e => e.ProducesEntry);
         }
 
+        private static string BuildMergeReport(LinkXmlMergeResult result)
+        {
+            StringBuilder builder = new StringBuilder();
+            builder.AppendLine($"Files found: {result.FilesFound}");
+            builder.AppendLine($"Files merged: {result.FilesMerged}");
+            builder.AppendLine($"Skipped invalid files: {result.SkippedFiles.Count}");
+            builder.AppendLine($"Duplicate entries collapsed: {result.DuplicatesCollapsed}");
+            builder.AppendLine($"Output: {LinkXmlWriter.DefaultPath}");
+
+            if (result.SkippedFiles.Count == 0)
+            {
+                return builder.ToString();
+            }
+
+            builder.AppendLine();
+            builder.AppendLine("Skipped files:");
+
+            foreach (LinkXmlMergeSkippedFile skippedFile in result.SkippedFiles)
+            {
+                builder.AppendLine($"{skippedFile.Path}: {skippedFile.Reason}");
+            }
+
+            return builder.ToString();
+        }
+
+        private static void LogSkippedFiles(LinkXmlMergeResult result)
+        {
+            foreach (LinkXmlMergeSkippedFile skippedFile in result.SkippedFiles)
+            {
+                Debug.LogWarning(
+                    $"[LinkXmlGenerator] Skipped link.xml at {skippedFile.Path}: {skippedFile.Reason}");
+            }
+        }
+
+        private void ShowPreview()
+        {
+            if (_showPreview)
+            {
+                return;
+            }
+
+            _showPreview = true;
+            _previewToggle.SetValueWithoutNotify(true);
+            ApplyShowPreview();
+        }
+
+        private void ApplyMergedXmlToTree(string xml)
+        {
+            if (!LinkXmlSelectionImporter.Apply(xml, _entries))
+            {
+                Debug.LogWarning("[LinkXmlGenerator] Failed to import merged link.xml into the tree.");
+                return;
+            }
+
+            _treeController.SetEntries(_entries);
+            _previewPanel.SetXml(xml);
+            _previewDirty = false;
+        }
+
+        private bool TryLoadLastProfile()
+        {
+            string path = EditorPrefs.GetString(LastProfilePathKey, string.Empty);
+
+            if (string.IsNullOrEmpty(path))
+            {
+                return false;
+            }
+
+            if (!File.Exists(path))
+            {
+                EditorPrefs.DeleteKey(LastProfilePathKey);
+                return false;
+            }
+
+            if (!LinkXmlProfileStorage.Load(_entries, path, false))
+            {
+                return false;
+            }
+
+            _treeController.Rebuild();
+            UpdateLoadedProfileState();
+
+            return true;
+        }
+
+        private void UpdateLoadedProfileState()
+        {
+            if (_showPreview)
+            {
+                RebuildPreview();
+                return;
+            }
+
+            MarkPreviewDirty();
+        }
+
         private void UpdateFooter()
         {
             int total = _entries.Count;
@@ -201,11 +339,16 @@ namespace DTech.LinkGuard.Editor
             int selectedTypes = _entries.Sum(e => e.SelectedTypeCount);
             int selectedMethods = _entries.Sum(e => e.SelectedMethodCount);
 
-            _footerLabel.text =
-                $"Assemblies: {total}    Selected: {selectedAssemblies} assemblies, {selectedTypes} types, {selectedMethods} methods    Target: {LinkXmlWriter.DefaultPath}";
+            _footerLabel.text = $"Assemblies: {total}    " +
+                $"Selected: {selectedAssemblies} assemblies, {selectedTypes} types, {selectedMethods} methods    " +
+                $"Target: {LinkXmlWriter.DefaultPath}";
 
-            bool showUpdate = _showPreview && _previewDirty && _entries.Count > 0;
-            _updatePreviewButton.style.display = showUpdate ? DisplayStyle.Flex : DisplayStyle.None;
+            bool needUpdatePreview = _showPreview && _previewDirty && _entries.Count > 0;
+            if (needUpdatePreview)
+            {
+                RebuildPreview();
+            }
+            
             _generateButton.SetEnabled(HasAnySelection());
         }
 
@@ -235,24 +378,22 @@ namespace DTech.LinkGuard.Editor
 
         private void LoadProfileClickedHandler()
         {
-            if (!LinkXmlProfileStorage.Load(_entries))
+            if (!LinkXmlProfileStorage.Load(_entries, out string path))
             {
                 return;
             }
 
+            EditorPrefs.SetString(LastProfilePathKey, path);
             _treeController.Rebuild();
-            if (_showPreview)
-            {
-                RebuildPreview();
-                return;
-            }
-
-            MarkPreviewDirty();
+            UpdateLoadedProfileState();
         }
 
         private void SaveProfileClickedHandler()
         {
-            LinkXmlProfileStorage.Save(_entries);
+            if (LinkXmlProfileStorage.Save(_entries, out string path))
+            {
+                EditorPrefs.SetString(LastProfilePathKey, path);
+            }
         }
 
         private void SearchChangedHandler(ChangeEvent<string> evt)

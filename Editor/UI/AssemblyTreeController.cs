@@ -35,6 +35,7 @@ namespace DTech.LinkGuard.Editor
             AssemblySource.UpmPackage,
             AssemblySource.Sdk,
             AssemblySource.Unity,
+            AssemblySource.LinkXml,
         };
 
         private readonly TreeView _tree;
@@ -525,6 +526,7 @@ namespace DTech.LinkGuard.Editor
                 AssemblySource.UpmPackage => "UPM packages",
                 AssemblySource.Sdk => "SDKs",
                 AssemblySource.Unity => "Unity modules",
+                AssemblySource.LinkXml => "Merged link.xml entries",
                 _ => source.ToString()
             };
         }

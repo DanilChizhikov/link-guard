@@ -13,25 +13,31 @@ namespace DTech.LinkGuard.Editor
 {
     internal static class AssemblyScanner
     {
-        public static List<AssemblyEntry> Scan()
+        public static List<AssemblyEntry> Scan(Action<string, float> reportProgress = null)
         {
             CompilationAssembly[] compilationAssemblies =
                 CompilationPipeline.GetAssemblies(AssembliesType.PlayerWithoutTestAssemblies);
+
+            List<CompilationAssembly> scanAssemblies = compilationAssemblies
+                .Where(assembly => !SystemAssemblyFilter.ShouldExclude(assembly.name))
+                .ToList();
+
+            reportProgress?.Invoke("Scanning assemblies...", 0.3f);
 
             Dictionary<string, Assembly> loadedByName = AppDomain.CurrentDomain
                 .GetAssemblies()
                 .GroupBy(a => a.GetName().Name)
                 .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
 
-            List<AssemblyEntry> result = new List<AssemblyEntry>(compilationAssemblies.Length);
+            List<AssemblyEntry> result = new List<AssemblyEntry>(scanAssemblies.Count);
 
             var sdks = new KnownSdks();
-            foreach (CompilationAssembly assembly in compilationAssemblies)
+            for (int i = 0; i < scanAssemblies.Count; i++)
             {
-                if (SystemAssemblyFilter.ShouldExclude(assembly.name))
-                {
-                    continue;
-                }
+                CompilationAssembly assembly = scanAssemblies[i];
+                reportProgress?.Invoke(
+                    $"Scanning assemblies... {i + 1}/{scanAssemblies.Count}: {assembly.name}",
+                    Mathf.Lerp(0.3f, 0.95f, (float)(i + 1) / scanAssemblies.Count));
 
                 AssemblySource source = ResolveSource(sdks, assembly);
                 List<TypeEntry> types = ResolveTypes(assembly, loadedByName);

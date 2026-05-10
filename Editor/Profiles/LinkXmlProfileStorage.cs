@@ -12,7 +12,7 @@ namespace DTech.LinkGuard.Editor
         private const string DefaultDirectory = "ProjectSettings";
         private const string DefaultFileName = "LinkXmlProfile.json";
 
-        public static bool Save(IReadOnlyList<AssemblyEntry> entries)
+        public static bool Save(IReadOnlyList<AssemblyEntry> entries, out string path)
         {
             string directory = Path.Combine(Directory.GetCurrentDirectory(), DefaultDirectory);
 
@@ -21,7 +21,7 @@ namespace DTech.LinkGuard.Editor
                 directory = Directory.GetCurrentDirectory();
             }
 
-            string path = EditorUtility.SaveFilePanel(
+            path = EditorUtility.SaveFilePanel(
                 "Save Link.xml Profile",
                 directory,
                 DefaultFileName,
@@ -41,7 +41,7 @@ namespace DTech.LinkGuard.Editor
             return true;
         }
 
-        public static bool Load(List<AssemblyEntry> entries)
+        public static bool Load(List<AssemblyEntry> entries, out string path)
         {
             string directory = Path.Combine(Directory.GetCurrentDirectory(), DefaultDirectory);
 
@@ -50,14 +50,42 @@ namespace DTech.LinkGuard.Editor
                 directory = Directory.GetCurrentDirectory();
             }
 
-            string path = EditorUtility.OpenFilePanel("Load Link.xml Profile", directory, "json");
+            path = EditorUtility.OpenFilePanel("Load Link.xml Profile", directory, "json");
 
             if (string.IsNullOrEmpty(path) || !File.Exists(path))
             {
                 return false;
             }
 
-            string json = File.ReadAllText(path);
+            return Load(entries, path, true);
+        }
+
+        public static bool Load(List<AssemblyEntry> entries, string path, bool showDialogs)
+        {
+            if (string.IsNullOrEmpty(path) || !File.Exists(path))
+            {
+                return false;
+            }
+
+            string json;
+
+            try
+            {
+                json = File.ReadAllText(path);
+            }
+            catch (Exception ex)
+            {
+                if (showDialogs)
+                {
+                    EditorUtility.DisplayDialog("Load Profile", $"Failed to read profile: {ex.Message}", "OK");
+                }
+                else
+                {
+                    Debug.LogWarning($"[LinkXmlGenerator] Failed to read profile at {path}: {ex.Message}");
+                }
+
+                return false;
+            }
 
             LinkXmlProfile profile;
 
@@ -67,14 +95,28 @@ namespace DTech.LinkGuard.Editor
             }
             catch (Exception ex)
             {
-                EditorUtility.DisplayDialog("Load Profile", $"Failed to parse profile: {ex.Message}", "OK");
+                if (showDialogs)
+                {
+                    EditorUtility.DisplayDialog("Load Profile", $"Failed to parse profile: {ex.Message}", "OK");
+                }
+                else
+                {
+                    Debug.LogWarning($"[LinkXmlGenerator] Failed to parse profile at {path}: {ex.Message}");
+                }
 
                 return false;
             }
 
             if (profile == null || profile.Selections == null)
             {
-                EditorUtility.DisplayDialog("Load Profile", "Profile is empty or invalid.", "OK");
+                if (showDialogs)
+                {
+                    EditorUtility.DisplayDialog("Load Profile", "Profile is empty or invalid.", "OK");
+                }
+                else
+                {
+                    Debug.LogWarning($"[LinkXmlGenerator] Profile at {path} is empty or invalid.");
+                }
 
                 return false;
             }

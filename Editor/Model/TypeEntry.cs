@@ -10,6 +10,7 @@ namespace DTech.LinkGuard.Editor
         public string LinkerFullname { get; }
         public string DisplayName { get; }
         public List<MethodEntry> Methods { get; }
+        public bool IsSynthetic { get; }
         public bool IsSelected { get; set; }
         public bool HasMethods => Methods.Count > 0;
         public bool ProducesEntry => IsSelected || Methods.Any(m => m.IsSelected);
@@ -19,12 +20,14 @@ namespace DTech.LinkGuard.Editor
             string fullname,
             string linkerFullname,
             string displayName,
-            IEnumerable<MethodEntry> methods)
+            IEnumerable<MethodEntry> methods,
+            bool isSynthetic = false)
         {
             Namespace = namespaceName ?? string.Empty;
             Fullname = fullname;
             LinkerFullname = linkerFullname;
             DisplayName = displayName;
+            IsSynthetic = isSynthetic;
             Methods = methods == null
                 ? new List<MethodEntry>()
                 : methods

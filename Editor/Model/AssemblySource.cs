@@ -7,5 +7,6 @@ namespace DTech.LinkGuard.Editor
         UpmPackage = 2,
         Sdk = 3,
         Unity = 4,
+        LinkXml = 5,
     }
 }
