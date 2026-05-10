@@ -8,7 +8,7 @@ namespace DTech.LinkGuard.Editor
     internal sealed class AssemblyTreeController
     {
         public Action OnChanged;
-        
+
         private const string RowClass = "lxg-row";
         private const string GroupLabelClass = "lxg-group-label";
         private const string GlobalLabelClass = "lxg-global-label";
@@ -20,11 +20,12 @@ namespace DTech.LinkGuard.Editor
         private const string HighlightOpen = "<color=#E0A030>";
         private const string HighlightClose = "</color>";
         private const string GlobalNamespaceLabel = "<i><color=#9090C0>&lt;global namespace&gt;</color></i>";
+        private const string GlobalNamespaceSearchText = "global namespace";
 
         private static readonly EventCallback<ChangeEvent<bool>> _assemblyToggleCallback = AssemblyToggleHandler;
         private static readonly EventCallback<ChangeEvent<bool>> _namespaceToggleCallback = NamespaceToggleHandler;
-        private static readonly EventCallback<ChangeEvent<bool>> _globalNamespaceToggleCallback = GlobalNamespaceToggleHandler;
-        private static readonly EventCallback<ChangeEvent<bool>> _globalTypeToggleCallback = GlobalTypeToggleHandler;
+        private static readonly EventCallback<ChangeEvent<bool>> _typeToggleCallback = TypeToggleHandler;
+        private static readonly EventCallback<ChangeEvent<bool>> _methodToggleCallback = MethodToggleHandler;
         private static readonly EventCallback<ChangeEvent<bool>> _ignoreToggleCallback = IgnoreToggleHandler;
 
         private static readonly AssemblySource[] _groupOrder =
@@ -38,7 +39,7 @@ namespace DTech.LinkGuard.Editor
 
         private readonly TreeView _tree;
         private readonly VisualElement _emptyHint;
-        
+
         private List<AssemblyEntry> _entries = new();
         private string _search = string.Empty;
         private int _idCounter;
@@ -94,8 +95,8 @@ namespace DTech.LinkGuard.Editor
 
         public void Rebuild()
         {
-            IList<TreeViewItemData<AssemblyTreeNode>> roots = BuildRoots();
             _idCounter = 0;
+            IList<TreeViewItemData<AssemblyTreeNode>> roots = BuildRoots();
             _tree.SetRootItems(roots);
             _tree.Rebuild();
 
@@ -138,32 +139,7 @@ namespace DTech.LinkGuard.Editor
                         continue;
                     }
 
-                    List<TreeViewItemData<AssemblyTreeNode>> children = new();
-
-                    if (entry.HasGlobalTypes)
-                    {
-                        List<TreeViewItemData<AssemblyTreeNode>> typeItems = new();
-
-                        foreach (GlobalTypeEntry type in entry.GlobalTypes)
-                        {
-                            if (!MatchesGlobalType(entry, type))
-                            {
-                                continue;
-                            }
-
-                            typeItems.Add(new TreeViewItemData<AssemblyTreeNode>(
-                                NextId(),
-                                AssemblyTreeNode.ForGlobalType(entry, type)));
-                        }
-
-                        if (typeItems.Count > 0)
-                        {
-                            children.Add(new TreeViewItemData<AssemblyTreeNode>(
-                                NextId(),
-                                AssemblyTreeNode.ForGlobalNamespace(entry),
-                                typeItems));
-                        }
-                    }
+                    List<TreeViewItemData<AssemblyTreeNode>> namespaceItems = new();
 
                     foreach (NamespaceEntry ns in entry.Namespaces)
                     {
@@ -172,15 +148,50 @@ namespace DTech.LinkGuard.Editor
                             continue;
                         }
 
-                        children.Add(new TreeViewItemData<AssemblyTreeNode>(
+                        List<TreeViewItemData<AssemblyTreeNode>> typeItems = new();
+
+                        foreach (TypeEntry type in ns.Types)
+                        {
+                            if (!MatchesType(entry, ns, type))
+                            {
+                                continue;
+                            }
+
+                            List<TreeViewItemData<AssemblyTreeNode>> methodItems = new();
+
+                            foreach (MethodEntry method in type.Methods)
+                            {
+                                if (!MatchesMethod(entry, ns, type, method))
+                                {
+                                    continue;
+                                }
+
+                                methodItems.Add(new TreeViewItemData<AssemblyTreeNode>(
+                                    NextId(),
+                                    AssemblyTreeNode.ForMethod(entry, ns, type, method)));
+                            }
+
+                            typeItems.Add(new TreeViewItemData<AssemblyTreeNode>(
+                                NextId(),
+                                AssemblyTreeNode.ForType(entry, ns, type),
+                                methodItems));
+                        }
+
+                        if (typeItems.Count == 0)
+                        {
+                            continue;
+                        }
+
+                        namespaceItems.Add(new TreeViewItemData<AssemblyTreeNode>(
                             NextId(),
-                            AssemblyTreeNode.ForNamespace(entry, ns)));
+                            AssemblyTreeNode.ForNamespace(entry, ns),
+                            typeItems));
                     }
 
                     assemblyItems.Add(new TreeViewItemData<AssemblyTreeNode>(
                         NextId(),
                         AssemblyTreeNode.ForAssembly(entry),
-                        children));
+                        namespaceItems));
                 }
 
                 if (assemblyItems.Count == 0)
@@ -204,49 +215,55 @@ namespace DTech.LinkGuard.Editor
                 return true;
             }
 
-            if (entry.Name.IndexOf(_search, StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                return true;
-            }
-
-            if (entry.Namespaces.Any(ns =>
-                    ns.Fullname.IndexOf(_search, StringComparison.OrdinalIgnoreCase) >= 0))
-            {
-                return true;
-            }
-
-            return entry.GlobalTypes.Any(t =>
-                t.Fullname.IndexOf(_search, StringComparison.OrdinalIgnoreCase) >= 0);
+            return Contains(entry.Name)
+                || entry.Namespaces.Any(ns => MatchesNamespace(entry, ns));
         }
 
         private bool MatchesNamespace(AssemblyEntry entry, NamespaceEntry ns)
         {
-            if (string.IsNullOrEmpty(_search))
+            if (string.IsNullOrEmpty(_search) || Contains(entry.Name))
             {
                 return true;
             }
 
-            if (entry.Name.IndexOf(_search, StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                return true;
-            }
-
-            return ns.Fullname.IndexOf(_search, StringComparison.OrdinalIgnoreCase) >= 0;
+            return Contains(GetNamespaceSearchText(ns))
+                || ns.Types.Any(t => MatchesType(entry, ns, t));
         }
 
-        private bool MatchesGlobalType(AssemblyEntry entry, GlobalTypeEntry type)
+        private bool MatchesType(AssemblyEntry entry, NamespaceEntry ns, TypeEntry type)
         {
-            if (string.IsNullOrEmpty(_search))
+            if (string.IsNullOrEmpty(_search)
+                || Contains(entry.Name)
+                || Contains(GetNamespaceSearchText(ns)))
             {
                 return true;
             }
 
-            if (entry.Name.IndexOf(_search, StringComparison.OrdinalIgnoreCase) >= 0)
+            return Contains(type.Fullname)
+                || Contains(type.LinkerFullname)
+                || Contains(type.DisplayName)
+                || type.Methods.Any(m => MatchesMethod(entry, ns, type, m));
+        }
+
+        private bool MatchesMethod(AssemblyEntry entry, NamespaceEntry ns, TypeEntry type, MethodEntry method)
+        {
+            if (string.IsNullOrEmpty(_search)
+                || Contains(entry.Name)
+                || Contains(GetNamespaceSearchText(ns))
+                || Contains(type.Fullname)
+                || Contains(type.LinkerFullname)
+                || Contains(type.DisplayName))
             {
                 return true;
             }
 
-            return type.Fullname.IndexOf(_search, StringComparison.OrdinalIgnoreCase) >= 0;
+            return Contains(method.Name) || Contains(method.Signature);
+        }
+
+        private bool Contains(string value)
+        {
+            return !string.IsNullOrEmpty(value)
+                && value.IndexOf(_search, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private int NextId()
@@ -298,6 +315,7 @@ namespace DTech.LinkGuard.Editor
             Toggle ignoreToggle = element.Q<Toggle>("row-ignore");
 
             UnregisterCallbacks(toggle, ignoreToggle);
+            toggle.SetEnabled(true);
             label.RemoveFromClassList(GroupLabelClass);
             label.RemoveFromClassList(GlobalLabelClass);
 
@@ -318,13 +336,13 @@ namespace DTech.LinkGuard.Editor
 
                     break;
 
-                case AssemblyTreeNodeKind.GlobalNamespace:
-                    BindGlobalNamespace(node, toggle, label, meta, pill, ignoreToggle);
+                case AssemblyTreeNodeKind.Type:
+                    BindType(node, toggle, label, meta, pill, ignoreToggle);
 
                     break;
 
-                case AssemblyTreeNodeKind.GlobalType:
-                    BindGlobalType(node, toggle, label, meta, pill, ignoreToggle);
+                case AssemblyTreeNodeKind.Method:
+                    BindMethod(node, toggle, label, meta, pill, ignoreToggle);
 
                     break;
             }
@@ -380,11 +398,10 @@ namespace DTech.LinkGuard.Editor
 
             label.text = HighlightMatch(entry.Name);
 
-            if (entry.HasNamespaces)
+            if (entry.TypeCount > 0)
             {
-                int selectedNs = entry.Namespaces.Count(n => n.IsSelected);
                 meta.style.display = DisplayStyle.Flex;
-                meta.text = $"[{selectedNs}/{entry.Namespaces.Count} ns]";
+                meta.text = $"[{entry.SelectedTypeCount}/{entry.TypeCount} types, {entry.SelectedMethodCount} methods]";
             }
             else
             {
@@ -402,49 +419,68 @@ namespace DTech.LinkGuard.Editor
         private void BindNamespace(AssemblyTreeNode node, Toggle toggle, Label label, Label meta, Label pill,
             Toggle ignoreToggle)
         {
+            NamespaceEntry ns = node.Namespace;
+
             toggle.style.display = DisplayStyle.Flex;
-            toggle.SetValueWithoutNotify(node.Namespace.IsSelected);
+            toggle.SetValueWithoutNotify(ns.IsSelected);
             toggle.RegisterValueChangedCallback(_namespaceToggleCallback);
-            toggle.userData = node.Namespace;
+            toggle.userData = ns;
 
-            label.text = HighlightMatch(node.Namespace.Fullname);
+            if (string.IsNullOrEmpty(ns.Fullname))
+            {
+                label.AddToClassList(GlobalLabelClass);
+                label.text = GlobalNamespaceLabel;
+            }
+            else
+            {
+                label.text = HighlightMatch(ns.Fullname);
+            }
 
-            meta.style.display = DisplayStyle.None;
-            pill.style.display = DisplayStyle.None;
-            ignoreToggle.style.display = DisplayStyle.None;
-        }
-
-        private void BindGlobalNamespace(AssemblyTreeNode node, Toggle toggle, Label label, Label meta, Label pill,
-            Toggle ignoreToggle)
-        {
-            AssemblyEntry entry = node.Assembly;
-
-            toggle.style.display = DisplayStyle.Flex;
-            toggle.SetValueWithoutNotify(entry.IsAllGlobalTypesSelected);
-            toggle.RegisterValueChangedCallback(_globalNamespaceToggleCallback);
-            toggle.userData = entry;
-
-            label.AddToClassList(GlobalLabelClass);
-            label.text = GlobalNamespaceLabel;
-
-            int selected = entry.GlobalTypes.Count(t => t.IsSelected);
             meta.style.display = DisplayStyle.Flex;
-            meta.text = $"[{selected}/{entry.GlobalTypes.Count} types]";
+            meta.text = $"[{ns.SelectedTypeCount}/{ns.Types.Count} types, {ns.SelectedMethodCount} methods]";
 
             pill.style.display = DisplayStyle.None;
             ignoreToggle.style.display = DisplayStyle.None;
         }
 
-        private void BindGlobalType(AssemblyTreeNode node, Toggle toggle, Label label, Label meta, Label pill,
+        private void BindType(AssemblyTreeNode node, Toggle toggle, Label label, Label meta, Label pill,
             Toggle ignoreToggle)
         {
+            TypeEntry type = node.Type;
+
             toggle.style.display = DisplayStyle.Flex;
-            toggle.SetValueWithoutNotify(node.GlobalType.IsSelected);
-            toggle.RegisterValueChangedCallback(_globalTypeToggleCallback);
-            toggle.userData = node.GlobalType;
+            toggle.SetValueWithoutNotify(type.IsSelected);
+            toggle.RegisterValueChangedCallback(_typeToggleCallback);
+            toggle.userData = type;
 
-            label.text = HighlightMatch(node.GlobalType.Fullname);
+            label.text = HighlightMatch(type.DisplayName);
 
+            if (type.HasMethods)
+            {
+                meta.style.display = DisplayStyle.Flex;
+                meta.text = $"[{type.SelectedMethodCount}/{type.Methods.Count} methods]";
+            }
+            else
+            {
+                meta.style.display = DisplayStyle.None;
+            }
+
+            pill.style.display = type.IsSelected ? DisplayStyle.Flex : DisplayStyle.None;
+            ignoreToggle.style.display = DisplayStyle.None;
+        }
+
+        private void BindMethod(AssemblyTreeNode node, Toggle toggle, Label label, Label meta, Label pill,
+            Toggle ignoreToggle)
+        {
+            MethodEntry method = node.Method;
+
+            toggle.style.display = DisplayStyle.Flex;
+            toggle.SetValueWithoutNotify(method.IsSelected);
+            toggle.SetEnabled(!node.Type.IsSelected);
+            toggle.RegisterValueChangedCallback(_methodToggleCallback);
+            toggle.userData = method;
+
+            label.text = HighlightMatch(method.Signature);
             meta.style.display = DisplayStyle.None;
             pill.style.display = DisplayStyle.None;
             ignoreToggle.style.display = DisplayStyle.None;
@@ -454,8 +490,8 @@ namespace DTech.LinkGuard.Editor
         {
             toggle.UnregisterValueChangedCallback(_assemblyToggleCallback);
             toggle.UnregisterValueChangedCallback(_namespaceToggleCallback);
-            toggle.UnregisterValueChangedCallback(_globalNamespaceToggleCallback);
-            toggle.UnregisterValueChangedCallback(_globalTypeToggleCallback);
+            toggle.UnregisterValueChangedCallback(_typeToggleCallback);
+            toggle.UnregisterValueChangedCallback(_methodToggleCallback);
             ignoreToggle.UnregisterValueChangedCallback(_ignoreToggleCallback);
         }
 
@@ -493,6 +529,11 @@ namespace DTech.LinkGuard.Editor
             };
         }
 
+        private static string GetNamespaceSearchText(NamespaceEntry ns)
+        {
+            return string.IsNullOrEmpty(ns.Fullname) ? GlobalNamespaceSearchText : ns.Fullname;
+        }
+
         private static void AssemblyToggleHandler(ChangeEvent<bool> evt)
         {
             if (evt.target is not Toggle toggle || toggle.userData is not AssemblyEntry entry)
@@ -515,29 +556,25 @@ namespace DTech.LinkGuard.Editor
             FindController(toggle)?.HandleSelectionChanged();
         }
 
-        private static void GlobalNamespaceToggleHandler(ChangeEvent<bool> evt)
+        private static void TypeToggleHandler(ChangeEvent<bool> evt)
         {
-            if (evt.target is not Toggle toggle || toggle.userData is not AssemblyEntry entry)
+            if (evt.target is not Toggle toggle || toggle.userData is not TypeEntry type)
             {
                 return;
             }
 
-            foreach (GlobalTypeEntry type in entry.GlobalTypes)
-            {
-                type.IsSelected = evt.newValue;
-            }
-
+            type.SelectAll(evt.newValue);
             FindController(toggle)?.HandleSelectionChanged();
         }
 
-        private static void GlobalTypeToggleHandler(ChangeEvent<bool> evt)
+        private static void MethodToggleHandler(ChangeEvent<bool> evt)
         {
-            if (evt.target is not Toggle toggle || toggle.userData is not GlobalTypeEntry type)
+            if (evt.target is not Toggle toggle || toggle.userData is not MethodEntry method)
             {
                 return;
             }
 
-            type.IsSelected = evt.newValue;
+            method.IsSelected = evt.newValue;
             FindController(toggle)?.HandleSelectionChanged();
         }
 

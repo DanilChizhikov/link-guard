@@ -5,7 +5,7 @@ namespace DTech.LinkGuard.Editor
 		Group = 0,
 		Assembly = 1,
 		Namespace = 2,
-		GlobalNamespace = 3,
-		GlobalType = 4,
+		Type = 3,
+		Method = 4,
 	}
 }
