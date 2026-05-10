@@ -1,0 +1,23 @@
+{
+    "name": "com.dtech.link-guard",
+    "displayName": "Link Guard",
+    "version": "1.0.0",
+    "unity": "6000.0",
+    "description": "",
+    "changelogUrl": "https://github.com/DanilChizhikov/link-guard/releases/tag/v1.0.0",
+    "documentationUrl": "https://github.com/DanilChizhikov/link-guard/",
+    "keywords": [
+    ],
+    "category": "Tools",
+    "author": "DTech",
+    "repository": {
+        "type": "git",
+        "url": "ssh://github.com:DanilChizhikov/link-guard.git",
+        "directory": "com.dtech"
+    },
+    "publishConfig": {
+        "registry": "https://npm.pkg.github.com/@DanilChizhikov"
+    },
+    "license": "MIT",
+    "readme": "README.md"
+}
