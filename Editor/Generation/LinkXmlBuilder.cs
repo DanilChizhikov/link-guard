@@ -94,11 +94,17 @@ namespace DTech.LinkGuard.Editor
                 AssemblySource.UpmPackage => "UPM packages",
                 AssemblySource.Sdk => "SDKs",
                 AssemblySource.Unity => "Unity built-in modules",
+                AssemblySource.LinkXml => "Merged link.xml entries",
                 _ => "Assemblies"
             };
         }
 
         private static string SerializeWithDeclaration(XDocument document)
+        {
+            return Serialize(document);
+        }
+
+        public static string Serialize(XDocument document)
         {
             StringBuilder builder = new StringBuilder();
             XmlWriterSettings settings = new XmlWriterSettings

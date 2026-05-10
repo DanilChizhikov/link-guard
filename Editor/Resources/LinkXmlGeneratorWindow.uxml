@@ -9,6 +9,7 @@
             <uie:ToolbarButton name="btn-load" text="Load Profile" class="lxg-tb-btn"/>
             <uie:ToolbarButton name="btn-save" text="Save Profile" class="lxg-tb-btn"/>
             <ui:VisualElement class="lxg-tb-flex"/>
+            <uie:ToolbarButton name="btn-merge" text="Merge link.xml" class="lxg-tb-btn"/>
             <uie:ToolbarToggle name="tgl-preview" text="Preview" class="lxg-tb-btn"/>
             <uie:ToolbarButton name="btn-generate" text="Generate link.xml" class="lxg-tb-btn lxg-generate"/>
         </uie:Toolbar>

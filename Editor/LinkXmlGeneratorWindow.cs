@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
@@ -79,6 +80,7 @@ namespace DTech.LinkGuard.Editor
             ToolbarButton noneBtn = root.Q<ToolbarButton>("btn-none");
             ToolbarButton loadBtn = root.Q<ToolbarButton>("btn-load");
             ToolbarButton saveBtn = root.Q<ToolbarButton>("btn-save");
+            ToolbarButton mergeBtn = root.Q<ToolbarButton>("btn-merge");
             _previewToggle = root.Q<ToolbarToggle>("tgl-preview");
             _generateButton = root.Q<ToolbarButton>("btn-generate");
 
@@ -105,6 +107,7 @@ namespace DTech.LinkGuard.Editor
             noneBtn.clicked += NoneClickedHandler;
             loadBtn.clicked += LoadProfileClickedHandler;
             saveBtn.clicked += SaveProfileClickedHandler;
+            mergeBtn.clicked += MergeLinkXmlClickedHandler;
             _generateButton.clicked += Generate;
             _updatePreviewButton.clicked += RebuildPreview;
 
@@ -179,6 +182,43 @@ namespace DTech.LinkGuard.Editor
             UpdateFooter();
         }
 
+        private void MergeLinkXmlClickedHandler()
+        {
+            IReadOnlyList<string> paths = LinkXmlMergeScanner.FindLinkXmlFiles();
+
+            if (paths.Count == 0)
+            {
+                EditorUtility.DisplayDialog(Title, "No link.xml files were found in Assets or Packages.", "OK");
+                return;
+            }
+
+            LinkXmlMergeResult result = LinkXmlMerger.Merge(paths);
+            LogSkippedFiles(result);
+
+            if (result.FilesMerged == 0)
+            {
+                EditorUtility.DisplayDialog(Title, BuildMergeReport(result), "OK");
+                return;
+            }
+
+            ShowPreview();
+            _previewPanel.SetXml(result.Xml);
+            _previewDirty = false;
+
+            if (!LinkXmlWriter.WriteWithConfirmation(result.Xml))
+            {
+                UpdateFooter();
+                return;
+            }
+
+            ApplyMergedXmlToTree(result.Xml);
+
+            string report = BuildMergeReport(result);
+            Debug.Log($"[LinkXmlGenerator] {report}");
+            EditorUtility.DisplayDialog(Title, report, "OK");
+            UpdateFooter();
+        }
+
         private void RebuildPreview()
         {
             string xml = LinkXmlBuilder.Build(_entries);
@@ -197,6 +237,65 @@ namespace DTech.LinkGuard.Editor
         private bool HasAnySelection()
         {
             return _entries.Any(e => e.ProducesEntry);
+        }
+
+        private static string BuildMergeReport(LinkXmlMergeResult result)
+        {
+            StringBuilder builder = new StringBuilder();
+            builder.AppendLine($"Files found: {result.FilesFound}");
+            builder.AppendLine($"Files merged: {result.FilesMerged}");
+            builder.AppendLine($"Skipped invalid files: {result.SkippedFiles.Count}");
+            builder.AppendLine($"Duplicate entries collapsed: {result.DuplicatesCollapsed}");
+            builder.AppendLine($"Output: {LinkXmlWriter.DefaultPath}");
+
+            if (result.SkippedFiles.Count == 0)
+            {
+                return builder.ToString();
+            }
+
+            builder.AppendLine();
+            builder.AppendLine("Skipped files:");
+
+            foreach (LinkXmlMergeSkippedFile skippedFile in result.SkippedFiles)
+            {
+                builder.AppendLine($"{skippedFile.Path}: {skippedFile.Reason}");
+            }
+
+            return builder.ToString();
+        }
+
+        private static void LogSkippedFiles(LinkXmlMergeResult result)
+        {
+            foreach (LinkXmlMergeSkippedFile skippedFile in result.SkippedFiles)
+            {
+                Debug.LogWarning(
+                    $"[LinkXmlGenerator] Skipped link.xml at {skippedFile.Path}: {skippedFile.Reason}");
+            }
+        }
+
+        private void ShowPreview()
+        {
+            if (_showPreview)
+            {
+                return;
+            }
+
+            _showPreview = true;
+            _previewToggle.SetValueWithoutNotify(true);
+            ApplyShowPreview();
+        }
+
+        private void ApplyMergedXmlToTree(string xml)
+        {
+            if (!LinkXmlSelectionImporter.Apply(xml, _entries))
+            {
+                Debug.LogWarning("[LinkXmlGenerator] Failed to import merged link.xml into the tree.");
+                return;
+            }
+
+            _treeController.SetEntries(_entries);
+            _previewPanel.SetXml(xml);
+            _previewDirty = false;
         }
 
         private bool TryLoadLastProfile()
