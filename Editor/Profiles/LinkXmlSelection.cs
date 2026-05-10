@@ -6,11 +6,13 @@ namespace DTech.LinkGuard.Editor
 	[Serializable]
 	internal sealed class LinkXmlSelection
 	{
-		public string Assembly { get; set; }
-		public bool PreserveAll { get; set; }
-		public bool IgnoreIfMissing { get; set; }
+		public string Assembly;
+		public bool PreserveAll;
+		public bool IgnoreIfMissing;
 
-		public List<string> Namespaces { get; set; } = new();
-		public List<string> GlobalTypes { get; set; } = new();
+		public List<string> Namespaces = new();
+		public List<string> GlobalTypes = new();
+		public List<string> Types = new();
+		public List<LinkXmlMethodSelection> Methods = new();
 	}
 }

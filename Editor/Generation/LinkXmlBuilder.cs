@@ -52,22 +52,32 @@ namespace DTech.LinkGuard.Editor
 
             if (!entry.IsAssemblySelected)
             {
-                foreach (GlobalTypeEntry type in entry.GlobalTypes.Where(t => t.IsSelected).OrderBy(t => t.Fullname))
+                foreach (TypeEntry type in entry.Types.Where(t => t.ProducesEntry).OrderBy(t => t.LinkerFullname))
                 {
-                    assembly.Add(new XElement("type",
-                        new XAttribute("fullname", type.Fullname),
-                        new XAttribute("preserve", "all")));
-                }
-
-                foreach (NamespaceEntry ns in entry.Namespaces.Where(n => n.IsSelected).OrderBy(n => n.Fullname))
-                {
-                    assembly.Add(new XElement("namespace",
-                        new XAttribute("fullname", ns.Fullname),
-                        new XAttribute("preserve", "all")));
+                    assembly.Add(BuildTypeElement(type));
                 }
             }
 
             return assembly;
+        }
+
+        private static XElement BuildTypeElement(TypeEntry type)
+        {
+            XElement typeElement = new XElement("type", new XAttribute("fullname", type.LinkerFullname));
+
+            if (type.IsSelected)
+            {
+                typeElement.Add(new XAttribute("preserve", "all"));
+
+                return typeElement;
+            }
+
+            foreach (MethodEntry method in type.Methods.Where(m => m.IsSelected).OrderBy(m => m.Signature))
+            {
+                typeElement.Add(new XElement("method", new XAttribute("signature", method.Signature)));
+            }
+
+            return typeElement;
         }
 
         private static string InsertBlankLineBeforeComments(string xml)

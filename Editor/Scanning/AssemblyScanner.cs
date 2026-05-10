@@ -34,10 +34,10 @@ namespace DTech.LinkGuard.Editor
                 }
 
                 AssemblySource source = ResolveSource(sdks, assembly);
-                ResolveTypes(assembly, loadedByName, out HashSet<string> namespaces, out HashSet<string> globalTypes);
+                List<TypeEntry> types = ResolveTypes(assembly, loadedByName);
                 string originPath = ResolveOriginPath(assembly);
 
-                result.Add(new AssemblyEntry(assembly.name, source, originPath, namespaces, globalTypes));
+                result.Add(new AssemblyEntry(assembly.name, source, originPath, types));
             }
 
             result.Sort((a, b) =>
@@ -94,33 +94,35 @@ namespace DTech.LinkGuard.Editor
             return lastSlash >= 0 ? first.Substring(0, lastSlash) : first;
         }
 
-        private static void ResolveTypes(
+        private static List<TypeEntry> ResolveTypes(
             CompilationAssembly assembly,
-            Dictionary<string, Assembly> loadedByName,
-            out HashSet<string> namespaces,
-            out HashSet<string> globalTypes)
+            Dictionary<string, Assembly> loadedByName)
         {
-            namespaces = new HashSet<string>(StringComparer.Ordinal);
-            globalTypes = new HashSet<string>(StringComparer.Ordinal);
+            List<TypeEntry> types = new List<TypeEntry>();
 
             if (loadedByName.TryGetValue(assembly.name, out Assembly loaded))
             {
-                CollectFromLoaded(loaded, namespaces, globalTypes);
+                CollectFromLoaded(loaded, types);
             }
             else if (!string.IsNullOrEmpty(assembly.outputPath) && File.Exists(assembly.outputPath))
             {
-                CollectFromOutput(assembly.outputPath, namespaces, globalTypes);
+                CollectFromOutput(assembly.outputPath, types);
             }
+
+            return types
+                .GroupBy(t => t.LinkerFullname)
+                .Select(g => g.First())
+                .OrderBy(t => t.LinkerFullname)
+                .ToList();
         }
 
-        private static void CollectFromLoaded(Assembly assembly,
-            HashSet<string> namespaces, HashSet<string> globalTypes)
+        private static void CollectFromLoaded(Assembly assembly, List<TypeEntry> types)
         {
             try
             {
                 foreach (Type type in assembly.GetTypes())
                 {
-                    AppendType(type, namespaces, globalTypes);
+                    AppendType(type, types);
                 }
             }
             catch (ReflectionTypeLoadException ex)
@@ -132,7 +134,7 @@ namespace DTech.LinkGuard.Editor
 
                 foreach (Type type in ex.Types)
                 {
-                    AppendType(type, namespaces, globalTypes);
+                    AppendType(type, types);
                 }
             }
             catch (Exception ex)
@@ -141,52 +143,191 @@ namespace DTech.LinkGuard.Editor
             }
         }
 
-        private static void AppendType(Type type, HashSet<string> namespaces, HashSet<string> globalTypes)
+        private static void AppendType(Type type, List<TypeEntry> types)
         {
-            if (type == null)
+            if (!ShouldIncludeType(type))
             {
                 return;
             }
 
-            if (!string.IsNullOrEmpty(type.Namespace))
-            {
-                namespaces.Add(type.Namespace);
+            string linkerFullname = GetLinkerTypeName(type);
+            string displayName = string.IsNullOrEmpty(type.Namespace)
+                ? linkerFullname
+                : linkerFullname.Substring(type.Namespace.Length + 1);
 
-                return;
-            }
-
-            if (type.IsNested)
-            {
-                return;
-            }
-
-            string fullname = type.FullName;
-
-            if (string.IsNullOrEmpty(fullname))
-            {
-                return;
-            }
-
-            if (fullname.IndexOf('<') >= 0 || fullname == "<Module>")
-            {
-                return;
-            }
-
-            if (type.IsDefined(typeof(CompilerGeneratedAttribute), false))
-            {
-                return;
-            }
-
-            globalTypes.Add(fullname);
+            types.Add(new TypeEntry(
+                type.Namespace,
+                type.FullName,
+                linkerFullname,
+                displayName,
+                CollectMethods(type)));
         }
 
-        private static void CollectFromOutput(string outputPath,
-            HashSet<string> namespaces, HashSet<string> globalTypes)
+        private static bool ShouldIncludeType(Type type)
+        {
+            if (type == null || string.IsNullOrEmpty(type.FullName))
+            {
+                return false;
+            }
+
+            if (type.FullName.IndexOf('<') >= 0 || type.FullName == "<Module>")
+            {
+                return false;
+            }
+
+            return !type.IsDefined(typeof(CompilerGeneratedAttribute), false);
+        }
+
+        private static List<MethodEntry> CollectMethods(Type type)
+        {
+            const BindingFlags flags = BindingFlags.DeclaredOnly
+                | BindingFlags.Instance
+                | BindingFlags.Static
+                | BindingFlags.Public
+                | BindingFlags.NonPublic;
+
+            List<MethodEntry> methods = new List<MethodEntry>();
+
+            foreach (ConstructorInfo constructor in type.GetConstructors(flags))
+            {
+                if (!ShouldIncludeConstructor(constructor))
+                {
+                    continue;
+                }
+
+                methods.Add(new MethodEntry(constructor.Name, BuildConstructorSignature(constructor), true));
+            }
+
+            ConstructorInfo typeInitializer = type.TypeInitializer;
+            if (ShouldIncludeConstructor(typeInitializer))
+            {
+                methods.Add(new MethodEntry(".cctor", BuildConstructorSignature(typeInitializer), true));
+            }
+
+            foreach (MethodInfo method in type.GetMethods(flags))
+            {
+                if (!ShouldIncludeMethod(method))
+                {
+                    continue;
+                }
+
+                methods.Add(new MethodEntry(method.Name, BuildMethodSignature(method), false));
+            }
+
+            return methods
+                .GroupBy(m => m.Signature)
+                .Select(g => g.First())
+                .ToList();
+        }
+
+        private static bool ShouldIncludeConstructor(ConstructorInfo constructor)
+        {
+            if (constructor == null)
+            {
+                return false;
+            }
+
+            return !constructor.IsDefined(typeof(CompilerGeneratedAttribute), false);
+        }
+
+        private static bool ShouldIncludeMethod(MethodInfo method)
+        {
+            if (method == null)
+            {
+                return false;
+            }
+
+            if (method.IsSpecialName || method.Name.IndexOf('<') >= 0)
+            {
+                return false;
+            }
+
+            return !method.IsDefined(typeof(CompilerGeneratedAttribute), false);
+        }
+
+        private static string BuildConstructorSignature(ConstructorInfo constructor)
+        {
+            return $"System.Void {constructor.Name}({BuildParameterList(constructor.GetParameters())})";
+        }
+
+        private static string BuildMethodSignature(MethodInfo method)
+        {
+            return $"{GetLinkerTypeName(method.ReturnType)} {method.Name}({BuildParameterList(method.GetParameters())})";
+        }
+
+        private static string BuildParameterList(ParameterInfo[] parameters)
+        {
+            return string.Join(",", parameters.Select(p => GetLinkerTypeName(p.ParameterType)));
+        }
+
+        private static string GetLinkerTypeName(Type type)
+        {
+            if (type == typeof(void))
+            {
+                return "System.Void";
+            }
+
+            if (type.IsByRef)
+            {
+                return $"{GetLinkerTypeName(type.GetElementType())}&";
+            }
+
+            if (type.IsPointer)
+            {
+                return $"{GetLinkerTypeName(type.GetElementType())}*";
+            }
+
+            if (type.IsArray)
+            {
+                return $"{GetLinkerTypeName(type.GetElementType())}{GetArrayRankSuffix(type.GetArrayRank())}";
+            }
+
+            if (type.IsGenericParameter)
+            {
+                return type.Name;
+            }
+
+            if (type.IsGenericType && !type.IsGenericTypeDefinition)
+            {
+                Type definition = type.GetGenericTypeDefinition();
+                string definitionName = GetNonGenericLinkerTypeName(definition);
+                string arguments = string.Join(",", type.GetGenericArguments().Select(GetLinkerTypeName));
+
+                return $"{definitionName}<{arguments}>";
+            }
+
+            return GetNonGenericLinkerTypeName(type);
+        }
+
+        private static string GetNonGenericLinkerTypeName(Type type)
+        {
+            string fullname = type.FullName ?? type.Name;
+
+            int genericArgumentStart = fullname.IndexOf("[[", StringComparison.Ordinal);
+            if (genericArgumentStart >= 0)
+            {
+                fullname = fullname.Substring(0, genericArgumentStart);
+            }
+
+            return fullname.Replace('+', '/');
+        }
+
+        private static string GetArrayRankSuffix(int rank)
+        {
+            if (rank <= 1)
+            {
+                return "[]";
+            }
+
+            return $"[{new string(',', rank - 1)}]";
+        }
+
+        private static void CollectFromOutput(string outputPath, List<TypeEntry> types)
         {
             try
             {
                 Assembly loaded = Assembly.LoadFrom(outputPath);
-                CollectFromLoaded(loaded, namespaces, globalTypes);
+                CollectFromLoaded(loaded, types);
             }
             catch (Exception ex)
             {

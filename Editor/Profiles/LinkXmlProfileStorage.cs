@@ -87,7 +87,10 @@ namespace DTech.LinkGuard.Editor
 
         private static LinkXmlProfile ToProfile(IReadOnlyList<AssemblyEntry> entries)
         {
-            LinkXmlProfile profile = new LinkXmlProfile();
+            LinkXmlProfile profile = new LinkXmlProfile
+            {
+                Version = 2
+            };
 
             foreach (AssemblyEntry entry in entries)
             {
@@ -102,12 +105,26 @@ namespace DTech.LinkGuard.Editor
                     PreserveAll = entry.IsAssemblySelected,
                     IgnoreIfMissing = entry.IgnoreIfMissing,
                     Namespaces = entry.Namespaces
-                        .Where(n => n.IsSelected)
+                        .Where(n => !string.IsNullOrEmpty(n.Fullname) && n.IsSelected)
                         .Select(n => n.Fullname)
                         .ToList(),
-                    GlobalTypes = entry.GlobalTypes
+                    GlobalTypes = entry.Types
+                        .Where(t => string.IsNullOrEmpty(t.Namespace) && t.IsSelected)
+                        .Select(t => t.LinkerFullname)
+                        .ToList(),
+                    Types = entry.Types
                         .Where(t => t.IsSelected)
-                        .Select(t => t.Fullname)
+                        .Select(t => t.LinkerFullname)
+                        .ToList(),
+                    Methods = entry.Types
+                        .Where(t => !t.IsSelected)
+                        .SelectMany(t => t.Methods
+                            .Where(m => m.IsSelected)
+                            .Select(m => new LinkXmlMethodSelection
+                            {
+                                Type = t.LinkerFullname,
+                                Signature = m.Signature
+                            }))
                         .ToList()
                 });
             }
@@ -140,22 +157,67 @@ namespace DTech.LinkGuard.Editor
                 entry.IgnoreIfMissing = selection.IgnoreIfMissing;
                 entry.IsAssemblySelected = selection.PreserveAll;
 
-                HashSet<string> wanted = selection.Namespaces == null
+                HashSet<string> wantedNamespaces = selection.Namespaces == null
                     ? new HashSet<string>(StringComparer.Ordinal)
                     : new HashSet<string>(selection.Namespaces, StringComparer.Ordinal);
 
                 foreach (NamespaceEntry ns in entry.Namespaces)
                 {
-                    ns.IsSelected = wanted.Contains(ns.Fullname);
+                    if (wantedNamespaces.Contains(ns.Fullname))
+                    {
+                        ns.IsSelected = true;
+                    }
                 }
 
-                HashSet<string> wantedTypes = selection.GlobalTypes == null
+                HashSet<string> wantedGlobalTypes = selection.GlobalTypes == null
                     ? new HashSet<string>(StringComparer.Ordinal)
                     : new HashSet<string>(selection.GlobalTypes, StringComparer.Ordinal);
 
-                foreach (GlobalTypeEntry t in entry.GlobalTypes)
+                HashSet<string> wantedTypes = selection.Types == null
+                    ? new HashSet<string>(StringComparer.Ordinal)
+                    : new HashSet<string>(selection.Types, StringComparer.Ordinal);
+
+                foreach (TypeEntry type in entry.Types)
                 {
-                    t.IsSelected = wantedTypes.Contains(t.Fullname);
+                    if (wantedTypes.Contains(type.LinkerFullname)
+                        || wantedTypes.Contains(type.Fullname)
+                        || wantedGlobalTypes.Contains(type.LinkerFullname)
+                        || wantedGlobalTypes.Contains(type.Fullname))
+                    {
+                        type.SelectAll(true);
+                    }
+                }
+
+                if (selection.Methods == null)
+                {
+                    continue;
+                }
+
+                foreach (LinkXmlMethodSelection methodSelection in selection.Methods)
+                {
+                    if (methodSelection == null
+                        || string.IsNullOrEmpty(methodSelection.Type)
+                        || string.IsNullOrEmpty(methodSelection.Signature))
+                    {
+                        continue;
+                    }
+
+                    TypeEntry type = entry.Types.FirstOrDefault(t =>
+                        string.Equals(t.LinkerFullname, methodSelection.Type, StringComparison.Ordinal)
+                        || string.Equals(t.Fullname, methodSelection.Type, StringComparison.Ordinal));
+
+                    if (type == null || type.IsSelected)
+                    {
+                        continue;
+                    }
+
+                    MethodEntry method = type.Methods.FirstOrDefault(m =>
+                        string.Equals(m.Signature, methodSelection.Signature, StringComparison.Ordinal));
+
+                    if (method != null)
+                    {
+                        method.IsSelected = true;
+                    }
                 }
             }
         }

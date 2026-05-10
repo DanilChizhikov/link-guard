@@ -197,9 +197,12 @@ namespace DTech.LinkGuard.Editor
         private void UpdateFooter()
         {
             int total = _entries.Count;
-            int selected = _entries.Count(e => e.ProducesEntry);
+            int selectedAssemblies = _entries.Count(e => e.IsAssemblySelected);
+            int selectedTypes = _entries.Sum(e => e.SelectedTypeCount);
+            int selectedMethods = _entries.Sum(e => e.SelectedMethodCount);
 
-            _footerLabel.text = $"Assemblies: {total}    Selected: {selected}    Target: {LinkXmlWriter.DefaultPath}";
+            _footerLabel.text =
+                $"Assemblies: {total}    Selected: {selectedAssemblies} assemblies, {selectedTypes} types, {selectedMethods} methods    Target: {LinkXmlWriter.DefaultPath}";
 
             bool showUpdate = _showPreview && _previewDirty && _entries.Count > 0;
             _updatePreviewButton.style.display = showUpdate ? DisplayStyle.Flex : DisplayStyle.None;
