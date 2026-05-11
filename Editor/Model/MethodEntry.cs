@@ -1,9 +1,14 @@
+using System.Collections.Generic;
+using System.Xml.Linq;
+
 namespace DTech.LinkGuard.Editor
 {
     internal sealed class MethodEntry
     {
         public string Name { get; }
         public string Signature { get; }
+        public List<XAttribute> LinkXmlAttributes { get; } = new();
+        public List<XElement> LinkXmlChildren { get; } = new();
         public bool IsConstructor { get; }
         public bool IsSynthetic { get; }
         public bool IsSelected { get; set; }

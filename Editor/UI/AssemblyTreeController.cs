@@ -78,6 +78,11 @@ namespace DTech.LinkGuard.Editor
 
         public void SelectAll(bool value)
         {
+            if (!value)
+            {
+                LinkXmlPreservation.Clear(_entries);
+            }
+
             foreach (AssemblyEntry entry in _entries)
             {
                 if (value)
@@ -544,6 +549,11 @@ namespace DTech.LinkGuard.Editor
             }
 
             entry.IsAssemblySelected = evt.newValue;
+            if (!evt.newValue)
+            {
+                LinkXmlPreservation.ClearAssembly(entry);
+            }
+
             FindController(toggle)?.HandleSelectionChanged();
         }
 
@@ -555,6 +565,14 @@ namespace DTech.LinkGuard.Editor
             }
 
             ns.IsSelected = evt.newValue;
+            if (!evt.newValue)
+            {
+                foreach (TypeEntry type in ns.Types)
+                {
+                    LinkXmlPreservation.ClearType(type);
+                }
+            }
+
             FindController(toggle)?.HandleSelectionChanged();
         }
 
@@ -566,6 +584,11 @@ namespace DTech.LinkGuard.Editor
             }
 
             type.SelectAll(evt.newValue);
+            if (!evt.newValue)
+            {
+                LinkXmlPreservation.ClearType(type);
+            }
+
             FindController(toggle)?.HandleSelectionChanged();
         }
 
@@ -577,6 +600,11 @@ namespace DTech.LinkGuard.Editor
             }
 
             method.IsSelected = evt.newValue;
+            if (!evt.newValue)
+            {
+                LinkXmlPreservation.ClearMethod(method);
+            }
+
             FindController(toggle)?.HandleSelectionChanged();
         }
 
