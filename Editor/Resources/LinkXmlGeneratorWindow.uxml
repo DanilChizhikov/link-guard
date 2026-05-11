@@ -1,0 +1,39 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements"
+         editor-extension-mode="True">
+    <ui:VisualElement name="root" class="lxg-root">
+        <uie:Toolbar name="main-toolbar">
+            <uie:ToolbarButton name="btn-refresh" text="Refresh" class="lxg-tb-btn"/>
+            <uie:ToolbarButton name="btn-select-all" text="Select All" class="lxg-tb-btn"/>
+            <uie:ToolbarButton name="btn-none" text="None" class="lxg-tb-btn"/>
+            <ui:VisualElement class="lxg-tb-spacer"/>
+            <uie:ToolbarButton name="btn-load" text="Load Profile" class="lxg-tb-btn"/>
+            <uie:ToolbarButton name="btn-save" text="Save Profile" class="lxg-tb-btn"/>
+            <ui:VisualElement class="lxg-tb-flex"/>
+            <uie:ToolbarButton name="btn-merge" text="Merge link.xml" class="lxg-tb-btn"/>
+            <uie:ToolbarToggle name="tgl-preview" text="Preview" class="lxg-tb-btn"/>
+            <uie:ToolbarButton name="btn-generate" text="Generate link.xml" class="lxg-tb-btn lxg-generate"/>
+        </uie:Toolbar>
+
+        <uie:Toolbar name="search-bar" class="lxg-search-bar">
+            <uie:ToolbarSearchField name="search-field" class="lxg-search-field"/>
+        </uie:Toolbar>
+
+        <ui:VisualElement name="content-area" class="lxg-content">
+            <ui:TwoPaneSplitView name="splitter" orientation="Vertical"
+                                 fixed-pane-index="1"
+                                 fixed-pane-initial-dimension="220">
+                <ui:VisualElement name="tree-host" class="lxg-tree-host">
+                    <ui:TreeView name="tree" fixed-item-height="20" class="lxg-tree"/>
+                    <ui:Label name="empty-hint" class="lxg-empty-hint"
+                              text="No assemblies. Press Refresh."/>
+                </ui:VisualElement>
+                <ui:VisualElement name="preview-host" class="lxg-preview-host"/>
+            </ui:TwoPaneSplitView>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="footer" class="lxg-footer">
+            <ui:Label name="footer-label" class="lxg-footer-label"/>
+            <ui:VisualElement class="lxg-tb-flex"/>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>
