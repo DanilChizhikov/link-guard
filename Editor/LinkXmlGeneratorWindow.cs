@@ -16,7 +16,6 @@ namespace DTech.LinkGuard.Editor
         private const string USSName = "LinkXmlGeneratorWindow";
         private const string ShowPreviewKey = "LinkXmlGenerator.ShowPreview";
         private const string SplitPxKey = "LinkXmlGenerator.SplitPx";
-        private const string LastProfilePathKey = "LinkXmlGenerator.LastProfilePath";
         private const string Title = "Link XML Generator";
         private const float DefaultPreviewHeight = 220f;
 
@@ -150,10 +149,8 @@ namespace DTech.LinkGuard.Editor
                 _entries = AssemblyScanner.Scan((message, progress) =>
                     EditorUtility.DisplayProgressBar(Title, message, progress));
                 _treeController.SetEntries(_entries);
-                if (!TryLoadLastProfile())
-                {
-                    MarkPreviewDirty();
-                }
+                TryLoadCurrentLinkXml();
+                MarkPreviewDirty();
             }
             finally
             {
@@ -295,28 +292,34 @@ namespace DTech.LinkGuard.Editor
             _previewDirty = false;
         }
 
-        private bool TryLoadLastProfile()
+        private bool TryLoadCurrentLinkXml()
         {
-            string path = EditorPrefs.GetString(LastProfilePathKey, string.Empty);
-
-            if (string.IsNullOrEmpty(path))
-            {
-                return false;
-            }
+            string path = LinkXmlWriter.DefaultPath;
 
             if (!File.Exists(path))
             {
-                EditorPrefs.DeleteKey(LastProfilePathKey);
                 return false;
             }
 
-            if (!LinkXmlProfileStorage.Load(_entries, path, false))
+            string xml;
+
+            try
             {
+                xml = File.ReadAllText(path);
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"[LinkXmlGenerator] Failed to read link.xml at {path}: {ex.Message}");
+                return false;
+            }
+
+            if (!LinkXmlSelectionImporter.Apply(xml, _entries))
+            {
+                Debug.LogWarning($"[LinkXmlGenerator] Failed to import link.xml at {path} into the tree.");
                 return false;
             }
 
             _treeController.Rebuild();
-            UpdateLoadedProfileState();
 
             return true;
         }
@@ -383,17 +386,13 @@ namespace DTech.LinkGuard.Editor
                 return;
             }
 
-            EditorPrefs.SetString(LastProfilePathKey, path);
             _treeController.Rebuild();
             UpdateLoadedProfileState();
         }
 
         private void SaveProfileClickedHandler()
         {
-            if (LinkXmlProfileStorage.Save(_entries, out string path))
-            {
-                EditorPrefs.SetString(LastProfilePathKey, path);
-            }
+            LinkXmlProfileStorage.Save(_entries, out _);
         }
 
         private void SearchChangedHandler(ChangeEvent<string> evt)
