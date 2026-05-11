@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Xml.Linq;
 
 namespace DTech.LinkGuard.Editor
 {
@@ -10,11 +11,14 @@ namespace DTech.LinkGuard.Editor
         public string LinkerFullname { get; }
         public string DisplayName { get; }
         public List<MethodEntry> Methods { get; }
+        public List<XAttribute> LinkXmlAttributes { get; } = new();
+        public List<XElement> LinkXmlChildren { get; } = new();
         public bool IsSynthetic { get; }
         public bool IsSelected { get; set; }
         public bool HasMethods => Methods.Count > 0;
-        public bool ProducesEntry => IsSelected || Methods.Any(m => m.IsSelected);
+        public bool ProducesEntry => IsSelected || HasLinkXmlContent || Methods.Any(m => m.IsSelected);
         public int SelectedMethodCount => Methods.Count(m => m.IsSelected);
+        private bool HasLinkXmlContent => LinkXmlAttributes.Count > 0 || LinkXmlChildren.Count > 0;
 
         public TypeEntry(string namespaceName,
             string fullname,

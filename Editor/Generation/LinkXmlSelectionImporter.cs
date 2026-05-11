@@ -41,6 +41,7 @@ namespace DTech.LinkGuard.Editor
             }
 
             ResetEntries(entries);
+            LinkXmlPreservation.CaptureDocument(document.Root);
 
             foreach (XElement assemblyElement in document.Root.Elements()
                 .Where(e => e.Name.LocalName == AssemblyElement))
@@ -53,6 +54,7 @@ namespace DTech.LinkGuard.Editor
 
         private static void ResetEntries(List<AssemblyEntry> entries)
         {
+            LinkXmlPreservation.Clear(entries);
             entries.RemoveAll(e => e.Source == AssemblySource.LinkXml);
 
             foreach (AssemblyEntry entry in entries)
@@ -84,6 +86,7 @@ namespace DTech.LinkGuard.Editor
             }
 
             entry.IgnoreIfMissing = IsTruthy(GetAttributeValue(assemblyElement, IgnoreIfMissingAttribute));
+            LinkXmlPreservation.CaptureAssembly(entry, assemblyElement);
 
             if (PreservesAll(assemblyElement))
             {
@@ -113,6 +116,8 @@ namespace DTech.LinkGuard.Editor
                 type = CreateSyntheticType(typeFullname);
                 AddType(entry, type);
             }
+
+            LinkXmlPreservation.CaptureType(type, typeElement);
 
             if (PreservesAll(typeElement))
             {
@@ -146,6 +151,7 @@ namespace DTech.LinkGuard.Editor
                 SortMethods(type.Methods);
             }
 
+            LinkXmlPreservation.CaptureMethod(method, methodElement);
             method.IsSelected = true;
         }
 

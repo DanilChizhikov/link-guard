@@ -196,15 +196,6 @@ namespace DTech.LinkGuard.Editor
             }
 
             ShowPreview();
-            _previewPanel.SetXml(result.Xml);
-            _previewDirty = false;
-
-            if (!LinkXmlWriter.WriteWithConfirmation(result.Xml))
-            {
-                UpdateFooter();
-                return;
-            }
-
             ApplyMergedXmlToTree(result.Xml);
 
             string report = BuildMergeReport(result);
@@ -240,7 +231,7 @@ namespace DTech.LinkGuard.Editor
             builder.AppendLine($"Files merged: {result.FilesMerged}");
             builder.AppendLine($"Skipped invalid files: {result.SkippedFiles.Count}");
             builder.AppendLine($"Duplicate entries collapsed: {result.DuplicatesCollapsed}");
-            builder.AppendLine($"Output: {LinkXmlWriter.DefaultPath}");
+            builder.AppendLine($"Output pending: press Generate link.xml to write {LinkXmlWriter.DefaultPath}");
 
             if (result.SkippedFiles.Count == 0)
             {
@@ -288,8 +279,7 @@ namespace DTech.LinkGuard.Editor
             }
 
             _treeController.SetEntries(_entries);
-            _previewPanel.SetXml(xml);
-            _previewDirty = false;
+            RebuildPreview();
         }
 
         private bool TryLoadCurrentLinkXml()
@@ -381,11 +371,13 @@ namespace DTech.LinkGuard.Editor
 
         private void LoadProfileClickedHandler()
         {
-            if (!LinkXmlProfileStorage.Load(_entries, out string path))
+            if (!LinkXmlProfileStorage.Load(_entries, out _))
             {
                 return;
             }
 
+            LinkXmlPreservation.Clear(_entries);
+            _entries.RemoveAll(e => e.Source == AssemblySource.LinkXml);
             _treeController.Rebuild();
             UpdateLoadedProfileState();
         }
