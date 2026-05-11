@@ -3,10 +3,16 @@
     "displayName": "Link Guard",
     "version": "1.0.0",
     "unity": "6000.0",
-    "description": "",
+    "description": "Unity editor tool for scanning assemblies and generating or merging link.xml preservation files.",
     "changelogUrl": "https://github.com/DanilChizhikov/link-guard/releases/tag/v1.0.0",
     "documentationUrl": "https://github.com/DanilChizhikov/link-guard/",
     "keywords": [
+        "link.xml",
+        "managed stripping",
+        "il2cpp",
+        "preserve",
+        "unity editor",
+        "upm"
     ],
     "category": "Tools",
     "author": "DTech",
