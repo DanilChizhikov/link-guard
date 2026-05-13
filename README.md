@@ -20,6 +20,7 @@ assemblies or types should be preserved.
     - [Merge Existing link.xml Files](#merge-existing-linkxml-files)
     - [Custom SDK Groups](#custom-sdk-groups)
     - [Custom Merge Providers](#custom-merge-providers)
+    - [Zenject Module](#zenject-module)
 - [License](#license)
 
 ## Getting Started
@@ -144,6 +145,49 @@ internal sealed class MyCustomMergeProvider : ILinkXmlMergeProvider
 
 The returned XML is merged into the window's tree like any other `link.xml` import; press `Generate link.xml`
 afterwards to write the result.
+
+### Zenject Module
+When either `com.svermeulen.extenject` or `com.modesttree.zenject` is present in the project manifest, the
+optional Zenject extension is compiled in and adds a **Merge from Zenject Installers** button to the toolbar.
+
+What the scan covers:
+- Rooted installers from every `SceneContext` in `EditorBuildSettings.scenes` (enabled scenes only).
+- Rooted installers from any addressable scene if the `com.unity.addressables` package is also installed.
+- The `Resources/ProjectContext` prefab.
+- Any prefab that carries a `GameObjectContext`.
+- Transitive `Container.Install<T>()` and `Container.InstallSubContainer<T>()` calls discovered through Mono.Cecil
+  IL analysis of `InstallBindings`.
+- Concrete types supplied to `Bind<T>()`, `BindInterfacesTo<T>()`, `BindFactory<...>`, `FromInstance(...)` and
+  similar binding helpers — including constructor-injected types whose constructor has no `[Inject]` attribute,
+  because the IL analyzer reads the actual binding regardless of attribute presence.
+- Supplementary `[Inject]`-annotated classes from the same set of reachable assemblies.
+
+Installers that are not referenced from any context are intentionally excluded so that dead-code types do not
+leak into `link.xml`.
+
+#### Build-time API
+For automated pipelines, call the patcher from a custom build hook:
+
+```csharp
+using DTech.LinkGuard.Editor.Zenject;
+using UnityEditor.Build;
+using UnityEditor.Build.Reporting;
+
+internal sealed class ZenjectLinkXmlBuildHook : IPreprocessBuildWithReport
+{
+    public int callbackOrder => 0;
+
+    public void OnPreprocessBuild(BuildReport report)
+    {
+        ZenjectPatchReport patchReport = ZenjectLinkXmlPatcher.Patch();
+        UnityEngine.Debug.Log(patchReport);
+    }
+}
+```
+
+`ZenjectLinkXmlPatcher.Patch(linkXmlPath)` loads the existing `link.xml` (or creates one), runs the same scan
+as the toolbar button, and writes the merged document back. It does not show any dialogs and does not register
+itself as a build callback — opt in from your own build script.
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
