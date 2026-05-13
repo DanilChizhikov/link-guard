@@ -1,0 +1,39 @@
+{
+    "name": "com.dtech.linkguard.editor.zenject",
+    "rootNamespace": "DTech.LinkGuard.Editor.Zenject",
+    "references": [
+        "GUID:2ad9859ee39c746e995f6a53e28c9fbd",
+        "GUID:b8a7efa7351d4c38ad2f57a043110a9a"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "Mono.Cecil.dll"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "LINKGUARD_ZENJECT_ENABLED"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.svermeulen.extenject",
+            "expression": "0.0.0",
+            "define": "LINKGUARD_ZENJECT_ENABLED"
+        },
+        {
+            "name": "com.modesttree.zenject",
+            "expression": "0.0.0",
+            "define": "LINKGUARD_ZENJECT_ENABLED"
+        },
+        {
+            "name": "com.unity.addressables",
+            "expression": "0.0.0",
+            "define": "LINKGUARD_ADDRESSABLES_ENABLED"
+        }
+    ],
+    "noEngineReferences": false
+}
