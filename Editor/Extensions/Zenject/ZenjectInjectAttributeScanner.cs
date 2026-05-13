@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using ZN = global::Zenject;
 
 namespace DTech.LinkGuard.Editor.Zenject
 {
@@ -76,7 +75,7 @@ namespace DTech.LinkGuard.Editor.Zenject
             {
                 foreach (ConstructorInfo ctor in type.GetConstructors(MemberFlags))
                 {
-                    if (ctor.IsDefined(typeof(ZN.InjectAttribute), false))
+                    if (ctor.IsDefined(typeof(InjectAttributeBase), false))
                     {
                         return true;
                     }
@@ -84,7 +83,7 @@ namespace DTech.LinkGuard.Editor.Zenject
 
                 foreach (MethodInfo method in type.GetMethods(MemberFlags))
                 {
-                    if (method.IsDefined(typeof(ZN.InjectAttribute), false))
+                    if (method.IsDefined(typeof(InjectAttributeBase), false))
                     {
                         return true;
                     }
@@ -92,7 +91,7 @@ namespace DTech.LinkGuard.Editor.Zenject
 
                 foreach (FieldInfo field in type.GetFields(MemberFlags))
                 {
-                    if (field.IsDefined(typeof(ZN.InjectAttribute), false))
+                    if (field.IsDefined(typeof(InjectAttributeBase), false))
                     {
                         return true;
                     }
@@ -100,7 +99,7 @@ namespace DTech.LinkGuard.Editor.Zenject
 
                 foreach (PropertyInfo property in type.GetProperties(MemberFlags))
                 {
-                    if (property.IsDefined(typeof(ZN.InjectAttribute), false))
+                    if (property.IsDefined(typeof(InjectAttributeBase), false))
                     {
                         return true;
                     }

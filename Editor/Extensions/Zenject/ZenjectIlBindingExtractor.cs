@@ -3,8 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Mono.Cecil;
-using Mono.Cecil.Cil;
 using UnityEditor.Compilation;
 using CompilationAssembly = UnityEditor.Compilation.Assembly;
 
@@ -55,8 +53,7 @@ namespace DTech.LinkGuard.Editor.Zenject
                 return new ZenjectExtractionResult(boundTypes, installEdges);
             }
 
-            using AssemblyContext context = AssemblyContext.Create();
-
+            AssemblyContext context = AssemblyContext.Create();
             foreach (Type installerType in installerTypes)
             {
                 if (installerType == null)
@@ -263,7 +260,7 @@ namespace DTech.LinkGuard.Editor.Zenject
             }
         }
 
-        private sealed class AssemblyContext : IDisposable
+        private sealed class AssemblyContext
         {
             private readonly DefaultAssemblyResolver _resolver = new DefaultAssemblyResolver();
             private readonly Dictionary<string, AssemblyDefinition> _byName = new(StringComparer.Ordinal);
@@ -354,31 +351,6 @@ namespace DTech.LinkGuard.Editor.Zenject
 
                 return null;
             }
-
-            public void Dispose()
-            {
-                foreach (AssemblyDefinition asm in _byName.Values)
-                {
-                    try
-                    {
-                        asm.Dispose();
-                    }
-                    catch
-                    {
-                        // ignored
-                    }
-                }
-                _byName.Clear();
-
-                try
-                {
-                    _resolver.Dispose();
-                }
-                catch
-                {
-                    // ignored
-                }
-            }
         }
 
         private static class TypeReferenceLoader
@@ -422,97 +394,6 @@ namespace DTech.LinkGuard.Editor.Zenject
             }
         }
 
-    }
-
-    internal sealed class ZenjectExtractionResult
-    {
-        public IReadOnlyCollection<TypeIdentifier> BoundTypes { get; }
-        public IReadOnlyCollection<Type> InstallEdges { get; }
-
-        public ZenjectExtractionResult(
-            IReadOnlyCollection<TypeIdentifier> boundTypes,
-            IReadOnlyCollection<Type> installEdges)
-        {
-            BoundTypes = boundTypes ?? Array.Empty<TypeIdentifier>();
-            InstallEdges = installEdges ?? Array.Empty<Type>();
-        }
-    }
-
-    internal sealed class TypeIdentifier : IEquatable<TypeIdentifier>
-    {
-        public string AssemblyName { get; }
-        public string TypeFullname { get; }
-        public bool IsGenericParameter { get; }
-
-        private TypeIdentifier(string assemblyName, string typeFullname, bool isGenericParameter)
-        {
-            AssemblyName = assemblyName ?? string.Empty;
-            TypeFullname = typeFullname ?? string.Empty;
-            IsGenericParameter = isGenericParameter;
-        }
-
-        public static TypeIdentifier From(string assemblyName, string typeFullname)
-        {
-            if (string.IsNullOrEmpty(assemblyName) || string.IsNullOrEmpty(typeFullname))
-            {
-                return null;
-            }
-
-            return new TypeIdentifier(assemblyName, typeFullname, false);
-        }
-
-        public static TypeIdentifier From(TypeReference reference)
-        {
-            if (reference == null)
-            {
-                return null;
-            }
-
-            if (reference.IsGenericParameter)
-            {
-                return new TypeIdentifier(string.Empty, reference.FullName, true);
-            }
-
-            TypeReference normalized = reference;
-            while (normalized is GenericInstanceType git)
-            {
-                normalized = git.ElementType;
-            }
-
-            string assemblyName = normalized.Scope?.Name ?? string.Empty;
-            if (assemblyName.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
-            {
-                assemblyName = assemblyName.Substring(0, assemblyName.Length - 4);
-            }
-
-            string typeFullname = normalized.FullName;
-            int genericMark = typeFullname.IndexOf('<');
-            if (genericMark >= 0)
-            {
-                typeFullname = typeFullname.Substring(0, genericMark);
-            }
-
-            return new TypeIdentifier(assemblyName, typeFullname, false);
-        }
-
-        public bool Equals(TypeIdentifier other)
-        {
-            if (other is null) return false;
-            return string.Equals(AssemblyName, other.AssemblyName, StringComparison.Ordinal)
-                && string.Equals(TypeFullname, other.TypeFullname, StringComparison.Ordinal);
-        }
-
-        public override bool Equals(object obj) => Equals(obj as TypeIdentifier);
-
-        public override int GetHashCode()
-        {
-            unchecked
-            {
-                return ((AssemblyName?.GetHashCode() ?? 0) * 397) ^ (TypeFullname?.GetHashCode() ?? 0);
-            }
-        }
-
-        public override string ToString() => $"{TypeFullname}@{AssemblyName}";
     }
 }
 #endif
