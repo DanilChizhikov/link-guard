@@ -451,6 +451,16 @@ namespace DTech.LinkGuard.Editor.Zenject
             IsGenericParameter = isGenericParameter;
         }
 
+        public static TypeIdentifier From(string assemblyName, string typeFullname)
+        {
+            if (string.IsNullOrEmpty(assemblyName) || string.IsNullOrEmpty(typeFullname))
+            {
+                return null;
+            }
+
+            return new TypeIdentifier(assemblyName, typeFullname, false);
+        }
+
         public static TypeIdentifier From(TypeReference reference)
         {
             if (reference == null)
