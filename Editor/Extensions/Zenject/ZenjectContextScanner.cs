@@ -26,7 +26,9 @@ namespace DTech.LinkGuard.Editor.Zenject
             ScanProjectContext(installerTypes, warnings);
             ScanPrefabsForContexts(installerTypes, warnings, reportProgress);
 
-            return new ZenjectRootedSet(installerTypes, warnings);
+            int ignoredInstallers = RemoveIgnoredInstallers(installerTypes);
+
+            return new ZenjectRootedSet(installerTypes, warnings, ignoredInstallers);
         }
 
         private static void ScanScenes(
@@ -291,17 +293,40 @@ namespace DTech.LinkGuard.Editor.Zenject
 
             installerTypes.Add(obj.GetType());
         }
+
+        private static int RemoveIgnoredInstallers(HashSet<Type> installerTypes)
+        {
+            int ignoredInstallers = 0;
+
+            installerTypes.RemoveWhere(type =>
+            {
+                bool ignored = ZenjectIgnoreFilter.IsIgnored(type);
+                if (ignored)
+                {
+                    ignoredInstallers++;
+                }
+
+                return ignored;
+            });
+
+            return ignoredInstallers;
+        }
     }
 
     internal sealed class ZenjectRootedSet
     {
         public IReadOnlyCollection<Type> InstallerTypes { get; }
         public IReadOnlyList<string> Warnings { get; }
+        public int IgnoredInstallerCount { get; }
 
-        public ZenjectRootedSet(IReadOnlyCollection<Type> installerTypes, IReadOnlyList<string> warnings)
+        public ZenjectRootedSet(
+            IReadOnlyCollection<Type> installerTypes,
+            IReadOnlyList<string> warnings,
+            int ignoredInstallerCount)
         {
             InstallerTypes = installerTypes ?? Array.Empty<Type>();
             Warnings = warnings ?? Array.Empty<string>();
+            IgnoredInstallerCount = ignoredInstallerCount;
         }
     }
 }

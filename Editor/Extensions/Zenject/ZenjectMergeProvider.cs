@@ -83,10 +83,16 @@ namespace DTech.LinkGuard.Editor.Zenject
                 AddRuntimeType(entries, inject);
             }
 
-            string report = BuildReport(rooted.InstallerTypes.Count, reachable.InstallerTypes.Count,
+            int ignoredInstallers = rooted.IgnoredInstallerCount + reachable.IgnoredInstallerCount;
+            string report = BuildReport(rooted.InstallerTypes.Count, reachable.InstallerTypes.Count, ignoredInstallers,
                 extraction.BoundTypes.Count, injectTypes.Count, entries.Count, warnings.Count);
 
-            return new ZenjectScanResult(entries, warnings, report);
+            return new ZenjectScanResult(
+                entries,
+                warnings,
+                report,
+                reachable.InstallerTypes.Count,
+                ignoredInstallers);
         }
 
         private static HashSet<Assembly> CollectAssemblies(IEnumerable<Type> types)
@@ -162,6 +168,7 @@ namespace DTech.LinkGuard.Editor.Zenject
         private static string BuildReport(
             int rootedInstallers,
             int reachableInstallers,
+            int ignoredInstallers,
             int boundTypes,
             int supplementaryInjectTypes,
             int totalEntries,
@@ -171,6 +178,7 @@ namespace DTech.LinkGuard.Editor.Zenject
             builder.AppendLine("Zenject merge:");
             builder.AppendLine($"  Rooted installers: {rootedInstallers}");
             builder.AppendLine($"  Reachable installers (incl. transitive Install<T>): {reachableInstallers}");
+            builder.AppendLine($"  Ignored installers: {ignoredInstallers}");
             builder.AppendLine($"  Bound types from IL analysis: {boundTypes}");
             builder.AppendLine($"  [Inject] supplementary types: {supplementaryInjectTypes}");
             builder.AppendLine($"  Total preserved entries: {totalEntries}");
@@ -186,12 +194,21 @@ namespace DTech.LinkGuard.Editor.Zenject
         public IReadOnlyCollection<TypeIdentifier> LinkEntries { get; }
         public IReadOnlyList<string> Warnings { get; }
         public string Report { get; }
+        public int ReachableInstallerCount { get; }
+        public int IgnoredInstallerCount { get; }
 
-        public ZenjectScanResult(IReadOnlyCollection<TypeIdentifier> linkEntries, IReadOnlyList<string> warnings, string report)
+        public ZenjectScanResult(
+            IReadOnlyCollection<TypeIdentifier> linkEntries,
+            IReadOnlyList<string> warnings,
+            string report,
+            int reachableInstallerCount,
+            int ignoredInstallerCount)
         {
             LinkEntries = linkEntries ?? Array.Empty<TypeIdentifier>();
             Warnings = warnings ?? Array.Empty<string>();
             Report = report ?? string.Empty;
+            ReachableInstallerCount = reachableInstallerCount;
+            IgnoredInstallerCount = ignoredInstallerCount;
         }
     }
 

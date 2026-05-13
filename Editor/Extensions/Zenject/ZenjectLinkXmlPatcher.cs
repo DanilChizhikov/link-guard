@@ -1,6 +1,5 @@
 #if LINKGUARD_ZENJECT_ENABLED
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Xml.Linq;
 using UnityEditor;
@@ -11,6 +10,7 @@ namespace DTech.LinkGuard.Editor.Zenject
     public static class ZenjectLinkXmlPatcher
     {
         public const string DefaultPath = "Assets/link.xml";
+
         private const string LinkerElement = "linker";
         private const string AssemblyElement = "assembly";
         private const string TypeElement = "type";
@@ -27,9 +27,6 @@ namespace DTech.LinkGuard.Editor.Zenject
 
             int added = 0;
             int alreadyCovered = 0;
-            int reachableInstallers = 0;
-
-            HashSet<string> installerKeys = new HashSet<string>(StringComparer.Ordinal);
 
             foreach (TypeIdentifier id in scan.LinkEntries)
             {
@@ -40,8 +37,6 @@ namespace DTech.LinkGuard.Editor.Zenject
                 {
                     continue;
                 }
-
-                installerKeys.Add($"{id.AssemblyName}::{id.TypeFullname}");
 
                 XElement assembly = FindOrCreateAssembly(linker, id.AssemblyName);
                 if (PreservesAll(assembly))
@@ -79,8 +74,6 @@ namespace DTech.LinkGuard.Editor.Zenject
                 added++;
             }
 
-            reachableInstallers = installerKeys.Count;
-
             string xml = LinkXmlBuilder.Serialize(document);
             File.WriteAllText(normalizedPath, xml);
 
@@ -90,9 +83,16 @@ namespace DTech.LinkGuard.Editor.Zenject
             }
 
             Debug.Log(
-                $"[LinkXmlGenerator] [zenject] patcher wrote {normalizedPath}: +{added} added, {alreadyCovered} already covered.");
+                $"[LinkXmlGenerator] [zenject] patcher wrote {normalizedPath}: "
+                + $"+{added} added, {alreadyCovered} already covered.");
 
-            return new ZenjectPatchReport(normalizedPath, added, alreadyCovered, reachableInstallers, scan.Warnings);
+            return new ZenjectPatchReport(
+                normalizedPath,
+                added,
+                alreadyCovered,
+                scan.ReachableInstallerCount,
+                scan.IgnoredInstallerCount,
+                scan.Warnings);
         }
 
         private static XDocument LoadOrCreateDocument(string path)
