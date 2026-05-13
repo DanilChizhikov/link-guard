@@ -1,6 +1,6 @@
 {
     "name": "com.dtech.linkguard.editor.zenject",
-    "rootNamespace": "DTech.LinkGuard.Editor.Zenject",
+    "rootNamespace": "DTech",
     "references": [
         "GUID:2ad9859ee39c746e995f6a53e28c9fbd",
         "GUID:b8a7efa7351d4c38ad2f57a043110a9a"
