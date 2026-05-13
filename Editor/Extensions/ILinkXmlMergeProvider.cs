@@ -5,6 +5,7 @@ namespace DTech.LinkGuard.Editor
         string Id { get; }
         string ButtonLabel { get; }
         string Tooltip { get; }
+        
         LinkXmlProviderResult Provide();
     }
 }
