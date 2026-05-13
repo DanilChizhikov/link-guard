@@ -19,6 +19,7 @@ assemblies or types should be preserved.
     - [Profiles](#profiles)
     - [Merge Existing link.xml Files](#merge-existing-linkxml-files)
     - [Custom SDK Groups](#custom-sdk-groups)
+    - [Custom Merge Providers](#custom-merge-providers)
 - [License](#license)
 
 ## Getting Started
@@ -116,6 +117,33 @@ public sealed class CustomSdkProvider : IKnownSdkProvider
 ```
 
 Assemblies matching custom patterns appear in the SDKs group.
+
+### Custom Merge Providers
+Beyond the built-in file merge, the toolbar can host any number of custom merge sources. Implement
+`DTech.LinkGuard.Editor.ILinkXmlMergeProvider` in any editor assembly and Link Guard discovers it through
+`TypeCache` when the window opens — a button is added automatically.
+
+```csharp
+using System;
+using DTech.LinkGuard.Editor;
+
+internal sealed class MyCustomMergeProvider : ILinkXmlMergeProvider
+{
+    public string Id => "my-source";
+    public string ButtonLabel => "Merge from My Source";
+    public string Tooltip => "Pull preserved types from My Source.";
+
+    public LinkXmlProviderResult Provide()
+    {
+        // Build a <linker> XML string however your source dictates.
+        string xml = "<linker><assembly fullname=\"MyAsm\"><type fullname=\"MyAsm.MyType\" preserve=\"all\"/></assembly></linker>";
+        return new LinkXmlProviderResult(xml, "Added MyAsm.MyType.", Array.Empty<string>(), success: true);
+    }
+}
+```
+
+The returned XML is merged into the window's tree like any other `link.xml` import; press `Generate link.xml`
+afterwards to write the result.
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

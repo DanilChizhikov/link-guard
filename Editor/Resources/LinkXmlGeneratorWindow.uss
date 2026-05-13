@@ -15,6 +15,10 @@
     flex-grow: 1;
 }
 
+.lxg-merge-buttons {
+    flex-direction: row;
+}
+
 .lxg-generate {
     background-color: rgba(110, 200, 110, 0.55);
     color: rgb(15, 30, 15);
