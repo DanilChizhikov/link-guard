@@ -17,7 +17,8 @@
         "LinkGuard.Mono.Cecil.dll",
         "LinkGuard.Mono.Cecil.Mdb.dll",
         "LinkGuard.Mono.Cecil.Pdb.dll",
-        "LinkGuard.Mono.Cecil.Rocks.dll"
+        "LinkGuard.Mono.Cecil.Rocks.dll",
+        "Zenject-usage.dll"
     ],
     "autoReferenced": true,
     "defineConstraints": [

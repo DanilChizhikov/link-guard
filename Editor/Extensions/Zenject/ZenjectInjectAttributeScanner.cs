@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using Zenject;
 
 namespace DTech.LinkGuard.Editor.Zenject
 {

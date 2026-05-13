@@ -1,5 +1,6 @@
 #if LINKGUARD_ZENJECT_ENABLED
 using System;
+using Mono.Cecil;
 
 namespace DTech.LinkGuard.Editor.Zenject
 {
@@ -8,7 +9,7 @@ namespace DTech.LinkGuard.Editor.Zenject
 		public string AssemblyName { get; }
 		public string TypeFullname { get; }
 		public bool IsGenericParameter { get; }
-
+		
 		private TypeIdentifier(string assemblyName, string typeFullname, bool isGenericParameter)
 		{
 			AssemblyName = assemblyName ?? string.Empty;
