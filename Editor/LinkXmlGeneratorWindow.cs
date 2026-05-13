@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
@@ -24,6 +23,7 @@ namespace DTech.LinkGuard.Editor
         private PreviewPanel _previewPanel;
         private TwoPaneSplitView _splitter;
         private VisualElement _previewHost;
+        private VisualElement _mergeButtonsHost;
         private ToolbarToggle _previewToggle;
         private ToolbarButton _generateButton;
         private Label _footerLabel;
@@ -78,7 +78,7 @@ namespace DTech.LinkGuard.Editor
             ToolbarButton noneBtn = root.Q<ToolbarButton>("btn-none");
             ToolbarButton loadBtn = root.Q<ToolbarButton>("btn-load");
             ToolbarButton saveBtn = root.Q<ToolbarButton>("btn-save");
-            ToolbarButton mergeBtn = root.Q<ToolbarButton>("btn-merge");
+            _mergeButtonsHost = root.Q<VisualElement>("merge-buttons");
             _previewToggle = root.Q<ToolbarToggle>("tgl-preview");
             _generateButton = root.Q<ToolbarButton>("btn-generate");
 
@@ -104,11 +104,34 @@ namespace DTech.LinkGuard.Editor
             noneBtn.clicked += NoneClickedHandler;
             loadBtn.clicked += LoadProfileClickedHandler;
             saveBtn.clicked += SaveProfileClickedHandler;
-            mergeBtn.clicked += MergeLinkXmlClickedHandler;
             _generateButton.clicked += Generate;
+
+            BuildMergeButtons();
 
             searchField.RegisterValueChangedCallback(SearchChangedHandler);
             _previewToggle.RegisterValueChangedCallback(PreviewToggleChangedHandler);
+        }
+
+        private void BuildMergeButtons()
+        {
+            if (_mergeButtonsHost == null)
+            {
+                return;
+            }
+
+            _mergeButtonsHost.Clear();
+
+            foreach (ILinkXmlMergeProvider provider in LinkXmlMergeProviderRegistry.Discover())
+            {
+                ILinkXmlMergeProvider captured = provider;
+                ToolbarButton button = new ToolbarButton(() => MergeProviderClickedHandler(captured))
+                {
+                    text = captured.ButtonLabel,
+                    tooltip = captured.Tooltip ?? string.Empty,
+                };
+                button.AddToClassList("lxg-tb-btn");
+                _mergeButtonsHost.Add(button);
+            }
         }
 
         private void WireToolbar()
@@ -176,32 +199,59 @@ namespace DTech.LinkGuard.Editor
             UpdateFooter();
         }
 
-        private void MergeLinkXmlClickedHandler()
+        private void MergeProviderClickedHandler(ILinkXmlMergeProvider provider)
         {
-            IReadOnlyList<string> paths = LinkXmlMergeScanner.FindLinkXmlFiles();
-
-            if (paths.Count == 0)
+            if (provider == null)
             {
-                EditorUtility.DisplayDialog(Title, "No link.xml files were found in Assets or Packages.", "OK");
                 return;
             }
 
-            LinkXmlMergeResult result = LinkXmlMerger.Merge(paths);
-            LogSkippedFiles(result);
+            LinkXmlProviderResult result;
 
-            if (result.FilesMerged == 0)
+            try
             {
-                EditorUtility.DisplayDialog(Title, BuildMergeReport(result), "OK");
+                result = provider.Provide();
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[LinkXmlGenerator] Merge provider '{provider.Id}' threw: {ex}");
+                EditorUtility.DisplayDialog(Title, $"Provider '{provider.Id}' failed: {ex.Message}", "OK");
+                return;
+            }
+
+            if (result == null)
+            {
+                EditorUtility.DisplayDialog(Title, $"Provider '{provider.Id}' returned no result.", "OK");
+                return;
+            }
+
+            LogProviderWarnings(provider, result);
+
+            if (!result.Success || !result.HasContent)
+            {
+                EditorUtility.DisplayDialog(Title, result.Report, "OK");
                 return;
             }
 
             ShowPreview();
             ApplyMergedXmlToTree(result.Xml);
 
-            string report = BuildMergeReport(result);
-            Debug.Log($"[LinkXmlGenerator] {report}");
-            EditorUtility.DisplayDialog(Title, report, "OK");
+            Debug.Log($"[LinkXmlGenerator] [{provider.Id}] {result.Report}");
+            EditorUtility.DisplayDialog(Title, result.Report, "OK");
             UpdateFooter();
+        }
+
+        private static void LogProviderWarnings(ILinkXmlMergeProvider provider, LinkXmlProviderResult result)
+        {
+            if (result.Warnings == null)
+            {
+                return;
+            }
+
+            foreach (string warning in result.Warnings)
+            {
+                Debug.LogWarning($"[LinkXmlGenerator] [{provider.Id}] {warning}");
+            }
         }
 
         private void RebuildPreview()
@@ -222,40 +272,6 @@ namespace DTech.LinkGuard.Editor
         private bool HasAnySelection()
         {
             return _entries.Any(e => e.ProducesEntry);
-        }
-
-        private static string BuildMergeReport(LinkXmlMergeResult result)
-        {
-            StringBuilder builder = new StringBuilder();
-            builder.AppendLine($"Files found: {result.FilesFound}");
-            builder.AppendLine($"Files merged: {result.FilesMerged}");
-            builder.AppendLine($"Skipped invalid files: {result.SkippedFiles.Count}");
-            builder.AppendLine($"Duplicate entries collapsed: {result.DuplicatesCollapsed}");
-            builder.AppendLine($"Output pending: press Generate link.xml to write {LinkXmlWriter.DefaultPath}");
-
-            if (result.SkippedFiles.Count == 0)
-            {
-                return builder.ToString();
-            }
-
-            builder.AppendLine();
-            builder.AppendLine("Skipped files:");
-
-            foreach (LinkXmlMergeSkippedFile skippedFile in result.SkippedFiles)
-            {
-                builder.AppendLine($"{skippedFile.Path}: {skippedFile.Reason}");
-            }
-
-            return builder.ToString();
-        }
-
-        private static void LogSkippedFiles(LinkXmlMergeResult result)
-        {
-            foreach (LinkXmlMergeSkippedFile skippedFile in result.SkippedFiles)
-            {
-                Debug.LogWarning(
-                    $"[LinkXmlGenerator] Skipped link.xml at {skippedFile.Path}: {skippedFile.Reason}");
-            }
         }
 
         private void ShowPreview()
