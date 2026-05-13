@@ -165,6 +165,22 @@ What the scan covers:
 Installers that are not referenced from any context are intentionally excluded so that dead-code types do not
 leak into `link.xml`.
 
+To exclude a referenced installer from Zenject discovery, mark the installer class with `LinkGuardIgnoreAttribute`.
+Ignored installers are not preserved, their bindings are not analyzed, and transitive `Install<T>()` calls from them
+are not followed.
+
+```csharp
+using DTech.LinkGuard;
+
+[LinkGuardIgnore]
+public sealed class DevOnlyInstaller : Zenject.MonoInstaller
+{
+    public override void InstallBindings()
+    {
+    }
+}
+```
+
 #### Build-time API
 For automated pipelines, call the patcher from a custom build hook:
 

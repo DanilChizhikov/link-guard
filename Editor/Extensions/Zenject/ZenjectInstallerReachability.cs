@@ -13,10 +13,11 @@ namespace DTech.LinkGuard.Editor.Zenject
         {
             HashSet<Type> reachable = new HashSet<Type>();
             List<string> warnings = new List<string>();
+            HashSet<Type> ignoredInstallers = new HashSet<Type>();
 
             if (roots == null)
             {
-                return new ZenjectReachableInstallers(reachable, warnings);
+                return new ZenjectReachableInstallers(reachable, warnings, ignoredInstallers.Count);
             }
 
             Queue<Type> queue = new Queue<Type>();
@@ -54,6 +55,16 @@ namespace DTech.LinkGuard.Editor.Zenject
                         continue;
                     }
 
+                    if (ZenjectIgnoreFilter.IsIgnored(edge))
+                    {
+                        if (IsInstallerType(edge))
+                        {
+                            ignoredInstallers.Add(edge);
+                        }
+
+                        continue;
+                    }
+
                     if (!IsInstallerType(edge))
                     {
                         // Container.Install<T>() can also be used for non-installer composites in some
@@ -70,7 +81,7 @@ namespace DTech.LinkGuard.Editor.Zenject
                 }
             }
 
-            return new ZenjectReachableInstallers(reachable, warnings);
+            return new ZenjectReachableInstallers(reachable, warnings, ignoredInstallers.Count);
         }
 
         private static bool IsInstallerType(Type type)
@@ -83,11 +94,16 @@ namespace DTech.LinkGuard.Editor.Zenject
     {
         public IReadOnlyCollection<Type> InstallerTypes { get; }
         public IReadOnlyList<string> Warnings { get; }
+        public int IgnoredInstallerCount { get; }
 
-        public ZenjectReachableInstallers(IReadOnlyCollection<Type> installerTypes, IReadOnlyList<string> warnings)
+        public ZenjectReachableInstallers(
+            IReadOnlyCollection<Type> installerTypes,
+            IReadOnlyList<string> warnings,
+            int ignoredInstallerCount)
         {
             InstallerTypes = installerTypes ?? Array.Empty<Type>();
             Warnings = warnings ?? Array.Empty<string>();
+            IgnoredInstallerCount = ignoredInstallerCount;
         }
     }
 }
