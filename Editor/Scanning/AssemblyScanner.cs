@@ -165,8 +165,7 @@ namespace DTech.LinkGuard.Editor
                 type.Namespace,
                 type.FullName,
                 linkerFullname,
-                displayName,
-                CollectMethods(type)));
+                displayName));
         }
 
         private static bool ShouldIncludeType(Type type)
@@ -182,88 +181,6 @@ namespace DTech.LinkGuard.Editor
             }
 
             return !type.IsDefined(typeof(CompilerGeneratedAttribute), false);
-        }
-
-        private static List<MethodEntry> CollectMethods(Type type)
-        {
-            const BindingFlags flags = BindingFlags.DeclaredOnly
-                | BindingFlags.Instance
-                | BindingFlags.Static
-                | BindingFlags.Public
-                | BindingFlags.NonPublic;
-
-            List<MethodEntry> methods = new List<MethodEntry>();
-
-            foreach (ConstructorInfo constructor in type.GetConstructors(flags))
-            {
-                if (!ShouldIncludeConstructor(constructor))
-                {
-                    continue;
-                }
-
-                methods.Add(new MethodEntry(constructor.Name, BuildConstructorSignature(constructor), true));
-            }
-
-            ConstructorInfo typeInitializer = type.TypeInitializer;
-            if (ShouldIncludeConstructor(typeInitializer))
-            {
-                methods.Add(new MethodEntry(".cctor", BuildConstructorSignature(typeInitializer), true));
-            }
-
-            foreach (MethodInfo method in type.GetMethods(flags))
-            {
-                if (!ShouldIncludeMethod(method))
-                {
-                    continue;
-                }
-
-                methods.Add(new MethodEntry(method.Name, BuildMethodSignature(method), false));
-            }
-
-            return methods
-                .GroupBy(m => m.Signature)
-                .Select(g => g.First())
-                .ToList();
-        }
-
-        private static bool ShouldIncludeConstructor(ConstructorInfo constructor)
-        {
-            if (constructor == null)
-            {
-                return false;
-            }
-
-            return !constructor.IsDefined(typeof(CompilerGeneratedAttribute), false);
-        }
-
-        private static bool ShouldIncludeMethod(MethodInfo method)
-        {
-            if (method == null)
-            {
-                return false;
-            }
-
-            if (method.IsSpecialName || method.Name.IndexOf('<') >= 0)
-            {
-                return false;
-            }
-
-            return !method.IsDefined(typeof(CompilerGeneratedAttribute), false);
-        }
-
-        private static string BuildConstructorSignature(ConstructorInfo constructor)
-        {
-            return $"System.Void {constructor.Name}({BuildParameterList(constructor.GetParameters())})";
-        }
-
-        private static string BuildMethodSignature(MethodInfo method)
-        {
-            return $"{GetLinkerTypeName(method.ReturnType)} {method.Name}({BuildParameterList(method.GetParameters())})";
-        }
-
-        private static string BuildParameterList(ParameterInfo[] parameters)
-        {
-            return string.Join(",", parameters.Select(p => GetLinkerTypeName(p.ParameterType)));
         }
 
         private static string GetLinkerTypeName(Type type)

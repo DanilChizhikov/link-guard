@@ -17,10 +17,9 @@ namespace DTech.LinkGuard.Editor
         public IEnumerable<TypeEntry> Types => Namespaces.SelectMany(ns => ns.Types);
         public int TypeCount => Namespaces.Sum(ns => ns.Types.Count);
         public int SelectedTypeCount => Types.Count(t => t.IsSelected);
-        public int SelectedMethodCount => Types.Sum(t => t.SelectedMethodCount);
         public bool IsAssemblySelected { get; set; }
         public bool ProducesEntry => IsAssemblySelected || HasLinkXmlContent || IsAnySelected;
-        
+
         private bool HasLinkXmlContent => LinkXmlAttributes.Count > 0 || LinkXmlChildren.Count > 0;
         private bool IsAnySelected => Namespaces.Any(ns => ns.ProducesEntry);
 
