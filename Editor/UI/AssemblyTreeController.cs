@@ -25,7 +25,6 @@ namespace DTech.LinkGuard.Editor
         private static readonly EventCallback<ChangeEvent<bool>> _assemblyToggleCallback = AssemblyToggleHandler;
         private static readonly EventCallback<ChangeEvent<bool>> _namespaceToggleCallback = NamespaceToggleHandler;
         private static readonly EventCallback<ChangeEvent<bool>> _typeToggleCallback = TypeToggleHandler;
-        private static readonly EventCallback<ChangeEvent<bool>> _methodToggleCallback = MethodToggleHandler;
         private static readonly EventCallback<ChangeEvent<bool>> _ignoreToggleCallback = IgnoreToggleHandler;
 
         private static readonly AssemblySource[] _groupOrder =
@@ -163,24 +162,9 @@ namespace DTech.LinkGuard.Editor
                                 continue;
                             }
 
-                            List<TreeViewItemData<AssemblyTreeNode>> methodItems = new();
-
-                            foreach (MethodEntry method in type.Methods)
-                            {
-                                if (!MatchesMethod(entry, ns, type, method))
-                                {
-                                    continue;
-                                }
-
-                                methodItems.Add(new TreeViewItemData<AssemblyTreeNode>(
-                                    NextId(),
-                                    AssemblyTreeNode.ForMethod(entry, ns, type, method)));
-                            }
-
                             typeItems.Add(new TreeViewItemData<AssemblyTreeNode>(
                                 NextId(),
-                                AssemblyTreeNode.ForType(entry, ns, type),
-                                methodItems));
+                                AssemblyTreeNode.ForType(entry, ns, type)));
                         }
 
                         if (typeItems.Count == 0)
@@ -247,23 +231,7 @@ namespace DTech.LinkGuard.Editor
 
             return Contains(type.Fullname)
                 || Contains(type.LinkerFullname)
-                || Contains(type.DisplayName)
-                || type.Methods.Any(m => MatchesMethod(entry, ns, type, m));
-        }
-
-        private bool MatchesMethod(AssemblyEntry entry, NamespaceEntry ns, TypeEntry type, MethodEntry method)
-        {
-            if (string.IsNullOrEmpty(_search)
-                || Contains(entry.Name)
-                || Contains(GetNamespaceSearchText(ns))
-                || Contains(type.Fullname)
-                || Contains(type.LinkerFullname)
-                || Contains(type.DisplayName))
-            {
-                return true;
-            }
-
-            return Contains(method.Name) || Contains(method.Signature);
+                || Contains(type.DisplayName);
         }
 
         private bool Contains(string value)
@@ -346,11 +314,6 @@ namespace DTech.LinkGuard.Editor
                     BindType(node, toggle, label, meta, pill, ignoreToggle);
 
                     break;
-
-                case AssemblyTreeNodeKind.Method:
-                    BindMethod(node, toggle, label, meta, pill, ignoreToggle);
-
-                    break;
             }
         }
 
@@ -407,7 +370,7 @@ namespace DTech.LinkGuard.Editor
             if (entry.TypeCount > 0)
             {
                 meta.style.display = DisplayStyle.Flex;
-                meta.text = $"[{entry.SelectedTypeCount}/{entry.TypeCount} types, {entry.SelectedMethodCount} methods]";
+                meta.text = $"[{entry.SelectedTypeCount}/{entry.TypeCount} types]";
             }
             else
             {
@@ -443,7 +406,7 @@ namespace DTech.LinkGuard.Editor
             }
 
             meta.style.display = DisplayStyle.Flex;
-            meta.text = $"[{ns.SelectedTypeCount}/{ns.Types.Count} types, {ns.SelectedMethodCount} methods]";
+            meta.text = $"[{ns.SelectedTypeCount}/{ns.Types.Count} types]";
 
             pill.style.display = DisplayStyle.None;
             ignoreToggle.style.display = DisplayStyle.None;
@@ -461,34 +424,9 @@ namespace DTech.LinkGuard.Editor
 
             label.text = HighlightMatch(type.DisplayName);
 
-            if (type.HasMethods)
-            {
-                meta.style.display = DisplayStyle.Flex;
-                meta.text = $"[{type.SelectedMethodCount}/{type.Methods.Count} methods]";
-            }
-            else
-            {
-                meta.style.display = DisplayStyle.None;
-            }
+            meta.style.display = DisplayStyle.None;
 
             pill.style.display = type.IsSelected ? DisplayStyle.Flex : DisplayStyle.None;
-            ignoreToggle.style.display = DisplayStyle.None;
-        }
-
-        private void BindMethod(AssemblyTreeNode node, Toggle toggle, Label label, Label meta, Label pill,
-            Toggle ignoreToggle)
-        {
-            MethodEntry method = node.Method;
-
-            toggle.style.display = DisplayStyle.Flex;
-            toggle.SetValueWithoutNotify(method.IsSelected);
-            toggle.SetEnabled(!node.Type.IsSelected);
-            toggle.RegisterValueChangedCallback(_methodToggleCallback);
-            toggle.userData = method;
-
-            label.text = HighlightMatch(method.Signature);
-            meta.style.display = DisplayStyle.None;
-            pill.style.display = DisplayStyle.None;
             ignoreToggle.style.display = DisplayStyle.None;
         }
 
@@ -497,7 +435,6 @@ namespace DTech.LinkGuard.Editor
             toggle.UnregisterValueChangedCallback(_assemblyToggleCallback);
             toggle.UnregisterValueChangedCallback(_namespaceToggleCallback);
             toggle.UnregisterValueChangedCallback(_typeToggleCallback);
-            toggle.UnregisterValueChangedCallback(_methodToggleCallback);
             ignoreToggle.UnregisterValueChangedCallback(_ignoreToggleCallback);
         }
 
@@ -587,22 +524,6 @@ namespace DTech.LinkGuard.Editor
             if (!evt.newValue)
             {
                 LinkXmlPreservation.ClearType(type);
-            }
-
-            FindController(toggle)?.HandleSelectionChanged();
-        }
-
-        private static void MethodToggleHandler(ChangeEvent<bool> evt)
-        {
-            if (evt.target is not Toggle toggle || toggle.userData is not MethodEntry method)
-            {
-                return;
-            }
-
-            method.IsSelected = evt.newValue;
-            if (!evt.newValue)
-            {
-                LinkXmlPreservation.ClearMethod(method);
             }
 
             FindController(toggle)?.HandleSelectionChanged();

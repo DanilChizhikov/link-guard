@@ -4,7 +4,7 @@
 ## Overview
 Link Guard is a Unity editor tool for building `link.xml` files used by managed code stripping and IL2CPP builds.
 It scans project assemblies, plugins, UPM packages, known SDKs, and Unity modules, then lets you choose which
-assemblies, types, or methods should be preserved.
+assemblies or types should be preserved.
 
 ## Table of Contents
 - [Getting Started](#getting-started)
@@ -45,12 +45,12 @@ For example `https://github.com/DanilChizhikov/link-guard.git#v1.0.0`.
 
 ## Features
 - Assembly scanning for project code, plugins, UPM packages, known SDKs, and Unity modules
-- Grouped tree view with assembly, namespace, type, and method selection
-- Search by assembly, namespace, type, method name, or method signature
+- Grouped tree view with assembly, namespace, and type selection
+- Search by assembly, namespace, or type name
 - `link.xml` generation to `Assets/link.xml`
 - Optional preview of generated XML before writing
 - Save and load selection profiles
-- Import the current `Assets/link.xml` when the window opens
+- Import the current `Assets/link.xml` when the window opens (legacy method-level entries are promoted to whole-type `preserve="all"` with a warning in the Console)
 - Merge existing `link.xml` files from `Assets` and `Packages`
 - Preserve unknown entries and custom XML attributes when importing or merging
 - `ignoreIfMissing` support for assembly entries
@@ -71,8 +71,8 @@ Press `Refresh` to scan assemblies. The tree is grouped by source:
 - Merged `link.xml` entries
 
 ### Generate link.xml
-1. Use the search field to find assemblies, namespaces, types, or methods.
-2. Select the entries that must be preserved.
+1. Use the search field to find assemblies, namespaces, or types.
+2. Select the entries that must be preserved. The smallest selectable unit is a type — once selected, the type is written with `preserve="all"`.
 3. Use `Select All` or `None` for quick bulk selection when needed.
 4. Press `Generate link.xml`.
 

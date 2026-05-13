@@ -330,10 +330,9 @@ namespace DTech.LinkGuard.Editor
             int total = _entries.Count;
             int selectedAssemblies = _entries.Count(e => e.IsAssemblySelected);
             int selectedTypes = _entries.Sum(e => e.SelectedTypeCount);
-            int selectedMethods = _entries.Sum(e => e.SelectedMethodCount);
 
             _footerLabel.text = $"Assemblies: {total}    " +
-                $"Selected: {selectedAssemblies} assemblies, {selectedTypes} types, {selectedMethods} methods    " +
+                $"Selected: {selectedAssemblies} assemblies, {selectedTypes} types    " +
                 $"Target: {LinkXmlWriter.DefaultPath}";
 
             bool needUpdatePreview = _showPreview && _previewDirty && _entries.Count > 0;
