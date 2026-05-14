@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Xml.Linq;
+using UnityEngine;
 
 namespace DTech.LinkGuard.Editor
 {
@@ -14,7 +15,6 @@ namespace DTech.LinkGuard.Editor
         private const string MethodElement = "method";
         private const string FullnameAttribute = "fullname";
         private const string PreserveAttribute = "preserve";
-        private const string SignatureAttribute = "signature";
         private const string IgnoreIfMissingAttribute = "ignoreIfMissing";
 
         public static bool Apply(string xml, List<AssemblyEntry> entries)
@@ -125,34 +125,15 @@ namespace DTech.LinkGuard.Editor
                 return;
             }
 
-            foreach (XElement methodElement in typeElement.Elements()
-                .Where(e => e.Name.LocalName == MethodElement))
+            bool hasMethodChildren = typeElement.Elements()
+                .Any(e => e.Name.LocalName == MethodElement);
+
+            if (hasMethodChildren)
             {
-                ApplyMethod(methodElement, type);
+                Debug.LogWarning(
+                    $"[LinkXmlGenerator] Type '{typeFullname}' in assembly '{entry.Name}' had method-level entries; promoted to preserve=\"all\".");
+                type.SelectAll(true);
             }
-        }
-
-        private static void ApplyMethod(XElement methodElement, TypeEntry type)
-        {
-            string signature = GetAttributeValue(methodElement, SignatureAttribute);
-
-            if (string.IsNullOrEmpty(signature) || type.IsSelected)
-            {
-                return;
-            }
-
-            MethodEntry method = type.Methods.FirstOrDefault(m =>
-                string.Equals(m.Signature, signature, StringComparison.Ordinal));
-
-            if (method == null)
-            {
-                method = new MethodEntry(signature, signature, false, true);
-                type.Methods.Add(method);
-                SortMethods(type.Methods);
-            }
-
-            LinkXmlPreservation.CaptureMethod(method, methodElement);
-            method.IsSelected = true;
         }
 
         private static AssemblyEntry FindAssembly(List<AssemblyEntry> entries, string assemblyName)
@@ -176,7 +157,6 @@ namespace DTech.LinkGuard.Editor
                 typeFullname,
                 typeFullname,
                 displayName,
-                Enumerable.Empty<MethodEntry>(),
                 true);
         }
 
@@ -184,11 +164,6 @@ namespace DTech.LinkGuard.Editor
         {
             foreach (NamespaceEntry ns in entry.Namespaces)
             {
-                foreach (TypeEntry type in ns.Types)
-                {
-                    type.Methods.RemoveAll(m => m.IsSynthetic);
-                }
-
                 ns.Types.RemoveAll(t => t.IsSynthetic);
             }
 
@@ -256,11 +231,6 @@ namespace DTech.LinkGuard.Editor
         private static void SortTypes(List<TypeEntry> types)
         {
             types.Sort((a, b) => string.Compare(a.LinkerFullname, b.LinkerFullname, StringComparison.Ordinal));
-        }
-
-        private static void SortMethods(List<MethodEntry> methods)
-        {
-            methods.Sort((a, b) => string.Compare(a.Signature, b.Signature, StringComparison.Ordinal));
         }
     }
 }

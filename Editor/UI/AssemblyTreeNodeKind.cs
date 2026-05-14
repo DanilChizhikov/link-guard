@@ -6,6 +6,5 @@ namespace DTech.LinkGuard.Editor
 		Assembly = 1,
 		Namespace = 2,
 		Type = 3,
-		Method = 4,
 	}
 }

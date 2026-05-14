@@ -4,7 +4,7 @@
 ## Overview
 Link Guard is a Unity editor tool for building `link.xml` files used by managed code stripping and IL2CPP builds.
 It scans project assemblies, plugins, UPM packages, known SDKs, and Unity modules, then lets you choose which
-assemblies, types, or methods should be preserved.
+assemblies or types should be preserved.
 
 ## Table of Contents
 - [Getting Started](#getting-started)
@@ -19,6 +19,8 @@ assemblies, types, or methods should be preserved.
     - [Profiles](#profiles)
     - [Merge Existing link.xml Files](#merge-existing-linkxml-files)
     - [Custom SDK Groups](#custom-sdk-groups)
+    - [Custom Merge Providers](#custom-merge-providers)
+    - [Zenject Module](#zenject-module)
 - [License](#license)
 
 ## Getting Started
@@ -45,12 +47,12 @@ For example `https://github.com/DanilChizhikov/link-guard.git#v1.0.0`.
 
 ## Features
 - Assembly scanning for project code, plugins, UPM packages, known SDKs, and Unity modules
-- Grouped tree view with assembly, namespace, type, and method selection
-- Search by assembly, namespace, type, method name, or method signature
+- Grouped tree view with assembly, namespace, and type selection
+- Search by assembly, namespace, or type name
 - `link.xml` generation to `Assets/link.xml`
 - Optional preview of generated XML before writing
 - Save and load selection profiles
-- Import the current `Assets/link.xml` when the window opens
+- Import the current `Assets/link.xml` when the window opens (legacy method-level entries are promoted to whole-type `preserve="all"` with a warning in the Console)
 - Merge existing `link.xml` files from `Assets` and `Packages`
 - Preserve unknown entries and custom XML attributes when importing or merging
 - `ignoreIfMissing` support for assembly entries
@@ -71,8 +73,8 @@ Press `Refresh` to scan assemblies. The tree is grouped by source:
 - Merged `link.xml` entries
 
 ### Generate link.xml
-1. Use the search field to find assemblies, namespaces, types, or methods.
-2. Select the entries that must be preserved.
+1. Use the search field to find assemblies, namespaces, or types.
+2. Select the entries that must be preserved. The smallest selectable unit is a type — once selected, the type is written with `preserve="all"`.
 3. Use `Select All` or `None` for quick bulk selection when needed.
 4. Press `Generate link.xml`.
 
@@ -116,6 +118,92 @@ public sealed class CustomSdkProvider : IKnownSdkProvider
 ```
 
 Assemblies matching custom patterns appear in the SDKs group.
+
+### Custom Merge Providers
+Beyond the built-in file merge, the toolbar can host any number of custom merge sources. Implement
+`DTech.LinkGuard.Editor.ILinkXmlMergeProvider` in any editor assembly and Link Guard discovers it through
+`TypeCache` when the window opens — a button is added automatically.
+
+```csharp
+using System;
+using DTech.LinkGuard.Editor;
+
+internal sealed class MyCustomMergeProvider : ILinkXmlMergeProvider
+{
+    public string Id => "my-source";
+    public string ButtonLabel => "Merge from My Source";
+    public string Tooltip => "Pull preserved types from My Source.";
+
+    public LinkXmlProviderResult Provide()
+    {
+        // Build a <linker> XML string however your source dictates.
+        string xml = "<linker><assembly fullname=\"MyAsm\"><type fullname=\"MyAsm.MyType\" preserve=\"all\"/></assembly></linker>";
+        return new LinkXmlProviderResult(xml, "Added MyAsm.MyType.", Array.Empty<string>(), success: true);
+    }
+}
+```
+
+The returned XML is merged into the window's tree like any other `link.xml` import; press `Generate link.xml`
+afterwards to write the result.
+
+### Zenject Module
+When either `com.svermeulen.extenject` or `com.modesttree.zenject` is present in the project manifest, the
+optional Zenject extension is compiled in and adds a **Merge from Zenject Installers** button to the toolbar.
+
+What the scan covers:
+- Rooted installers from every `SceneContext` in `EditorBuildSettings.scenes` (enabled scenes only).
+- Rooted installers from any addressable scene if the `com.unity.addressables` package is also installed.
+- The `Resources/ProjectContext` prefab.
+- Any prefab that carries a `GameObjectContext`.
+- Transitive `Container.Install<T>()` and `Container.InstallSubContainer<T>()` calls discovered through Mono.Cecil
+  IL analysis of `InstallBindings`.
+- Concrete types supplied to `Bind<T>()`, `BindInterfacesTo<T>()`, `BindFactory<...>`, `FromInstance(...)` and
+  similar binding helpers — including constructor-injected types whose constructor has no `[Inject]` attribute,
+  because the IL analyzer reads the actual binding regardless of attribute presence.
+- Supplementary `[Inject]`-annotated classes from the same set of reachable assemblies.
+
+Installers that are not referenced from any context are intentionally excluded so that dead-code types do not
+leak into `link.xml`.
+
+To exclude a referenced installer from Zenject discovery, mark the installer class with `LinkGuardIgnoreAttribute`.
+Ignored installers are not preserved, their bindings are not analyzed, and transitive `Install<T>()` calls from them
+are not followed.
+
+```csharp
+using DTech.LinkGuard;
+
+[LinkGuardIgnore]
+public sealed class DevOnlyInstaller : Zenject.MonoInstaller
+{
+    public override void InstallBindings()
+    {
+    }
+}
+```
+
+#### Build-time API
+For automated pipelines, call the patcher from a custom build hook:
+
+```csharp
+using DTech.LinkGuard.Editor.Zenject;
+using UnityEditor.Build;
+using UnityEditor.Build.Reporting;
+
+internal sealed class ZenjectLinkXmlBuildHook : IPreprocessBuildWithReport
+{
+    public int callbackOrder => 0;
+
+    public void OnPreprocessBuild(BuildReport report)
+    {
+        ZenjectPatchReport patchReport = ZenjectLinkXmlPatcher.Patch();
+        UnityEngine.Debug.Log(patchReport);
+    }
+}
+```
+
+`ZenjectLinkXmlPatcher.Patch(linkXmlPath)` loads the existing `link.xml` (or creates one), runs the same scan
+as the toolbar button, and writes the merged document back. It does not show any dialogs and does not register
+itself as a build callback — opt in from your own build script.
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

@@ -6,7 +6,7 @@ namespace DTech.LinkGuard.Editor
     [Serializable]
     internal sealed class LinkXmlProfile
     {
-        public int Version = 2;
+        public int Version = 3;
         public List<LinkXmlSelection> Selections = new();
     }
 }

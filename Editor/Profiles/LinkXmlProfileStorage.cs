@@ -131,7 +131,7 @@ namespace DTech.LinkGuard.Editor
         {
             LinkXmlProfile profile = new LinkXmlProfile
             {
-                Version = 2
+                Version = 3
             };
 
             foreach (AssemblyEntry entry in entries)
@@ -157,16 +157,6 @@ namespace DTech.LinkGuard.Editor
                     Types = entry.Types
                         .Where(t => t.IsSelected)
                         .Select(t => t.LinkerFullname)
-                        .ToList(),
-                    Methods = entry.Types
-                        .Where(t => !t.IsSelected)
-                        .SelectMany(t => t.Methods
-                            .Where(m => m.IsSelected)
-                            .Select(m => new LinkXmlMethodSelection
-                            {
-                                Type = t.LinkerFullname,
-                                Signature = m.Signature
-                            }))
                         .ToList()
                 });
             }
@@ -183,6 +173,8 @@ namespace DTech.LinkGuard.Editor
                 entry.SelectAll(false);
                 entry.IgnoreIfMissing = false;
             }
+
+            int promotedTypes = 0;
 
             foreach (LinkXmlSelection selection in profile.Selections)
             {
@@ -230,38 +222,53 @@ namespace DTech.LinkGuard.Editor
                     }
                 }
 
-                if (selection.Methods == null)
+                promotedTypes += PromoteLegacyMethodSelections(selection, entry);
+            }
+
+            if (promotedTypes > 0)
+            {
+                Debug.LogWarning(
+                    $"[LinkXmlGenerator] Loaded legacy v2 profile: promoted {promotedTypes} method-level selection(s) to whole-type preserve=\"all\".");
+            }
+        }
+
+        private static int PromoteLegacyMethodSelections(LinkXmlSelection selection, AssemblyEntry entry)
+        {
+            if (selection.Methods == null || selection.Methods.Count == 0)
+            {
+                return 0;
+            }
+
+            HashSet<string> uniqueTypes = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (LinkXmlMethodSelection method in selection.Methods)
+            {
+                if (method == null || string.IsNullOrEmpty(method.Type))
                 {
                     continue;
                 }
 
-                foreach (LinkXmlMethodSelection methodSelection in selection.Methods)
-                {
-                    if (methodSelection == null
-                        || string.IsNullOrEmpty(methodSelection.Type)
-                        || string.IsNullOrEmpty(methodSelection.Signature))
-                    {
-                        continue;
-                    }
-
-                    TypeEntry type = entry.Types.FirstOrDefault(t =>
-                        string.Equals(t.LinkerFullname, methodSelection.Type, StringComparison.Ordinal)
-                        || string.Equals(t.Fullname, methodSelection.Type, StringComparison.Ordinal));
-
-                    if (type == null || type.IsSelected)
-                    {
-                        continue;
-                    }
-
-                    MethodEntry method = type.Methods.FirstOrDefault(m =>
-                        string.Equals(m.Signature, methodSelection.Signature, StringComparison.Ordinal));
-
-                    if (method != null)
-                    {
-                        method.IsSelected = true;
-                    }
-                }
+                uniqueTypes.Add(method.Type);
             }
+
+            int promoted = 0;
+
+            foreach (string typeName in uniqueTypes)
+            {
+                TypeEntry type = entry.Types.FirstOrDefault(t =>
+                    string.Equals(t.LinkerFullname, typeName, StringComparison.Ordinal)
+                    || string.Equals(t.Fullname, typeName, StringComparison.Ordinal));
+
+                if (type == null || type.IsSelected)
+                {
+                    continue;
+                }
+
+                type.SelectAll(true);
+                promoted++;
+            }
+
+            return promoted;
         }
     }
 }

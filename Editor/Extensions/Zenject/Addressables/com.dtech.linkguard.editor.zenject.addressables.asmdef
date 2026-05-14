@@ -1,0 +1,38 @@
+{
+    "name": "com.dtech.linkguard.editor.zenject.addressables",
+    "rootNamespace": "DTech",
+    "references": [
+        "com.dtech.linkguard.editor.zenject",
+        "Unity.Addressables.Editor"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "LINKGUARD_ZENJECT_ENABLED",
+        "LINKGUARD_ADDRESSABLES_ENABLED"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.svermeulen.extenject",
+            "expression": "0.0.0",
+            "define": "LINKGUARD_ZENJECT_ENABLED"
+        },
+        {
+            "name": "com.modesttree.zenject",
+            "expression": "0.0.0",
+            "define": "LINKGUARD_ZENJECT_ENABLED"
+        },
+        {
+            "name": "com.unity.addressables",
+            "expression": "0.0.0",
+            "define": "LINKGUARD_ADDRESSABLES_ENABLED"
+        }
+    ],
+    "noEngineReferences": false
+}

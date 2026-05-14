@@ -20,7 +20,6 @@ namespace DTech.LinkGuard.Editor
         }
         public bool ProducesEntry => Types.Any(t => t.ProducesEntry);
         public int SelectedTypeCount => Types.Count(t => t.IsSelected);
-        public int SelectedMethodCount => Types.Sum(t => t.SelectedMethodCount);
 
         public NamespaceEntry(string fullname, IEnumerable<TypeEntry> types)
         {

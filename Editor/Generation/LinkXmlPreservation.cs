@@ -12,7 +12,6 @@ namespace DTech.LinkGuard.Editor
         private const string MethodElement = "method";
         private const string FullnameAttribute = "fullname";
         private const string PreserveAttribute = "preserve";
-        private const string SignatureAttribute = "signature";
         private const string IgnoreIfMissingAttribute = "ignoreIfMissing";
 
         private static readonly List<XAttribute> _rootAttributes = new();
@@ -37,12 +36,6 @@ namespace DTech.LinkGuard.Editor
                 {
                     type.LinkXmlAttributes.Clear();
                     type.LinkXmlChildren.Clear();
-
-                    foreach (MethodEntry method in type.Methods)
-                    {
-                        method.LinkXmlAttributes.Clear();
-                        method.LinkXmlChildren.Clear();
-                    }
                 }
             }
         }
@@ -73,17 +66,6 @@ namespace DTech.LinkGuard.Editor
         {
             type.LinkXmlAttributes.Clear();
             type.LinkXmlChildren.Clear();
-
-            foreach (MethodEntry method in type.Methods)
-            {
-                ClearMethod(method);
-            }
-        }
-
-        public static void ClearMethod(MethodEntry method)
-        {
-            method.LinkXmlAttributes.Clear();
-            method.LinkXmlChildren.Clear();
         }
 
         public static void CaptureAssembly(AssemblyEntry entry, XElement assemblyElement)
@@ -96,12 +78,6 @@ namespace DTech.LinkGuard.Editor
         {
             CaptureAttributes(type.LinkXmlAttributes, typeElement, IsModeledTypeAttribute);
             CaptureChildren(type.LinkXmlChildren, typeElement, MethodElement);
-        }
-
-        public static void CaptureMethod(MethodEntry method, XElement methodElement)
-        {
-            CaptureAttributes(method.LinkXmlAttributes, methodElement, IsModeledMethodAttribute);
-            CaptureChildren(method.LinkXmlChildren, methodElement, string.Empty);
         }
 
         public static void ApplyToRoot(XElement linker)
@@ -120,12 +96,6 @@ namespace DTech.LinkGuard.Editor
         {
             AddMissingAttributes(typeElement, type.LinkXmlAttributes);
             AddClonedChildren(typeElement, type.LinkXmlChildren);
-        }
-
-        public static void ApplyToMethod(XElement methodElement, MethodEntry method)
-        {
-            AddMissingAttributes(methodElement, method.LinkXmlAttributes);
-            AddClonedChildren(methodElement, method.LinkXmlChildren);
         }
 
         private static void CaptureAttributes(
@@ -158,11 +128,6 @@ namespace DTech.LinkGuard.Editor
         {
             return IsAttribute(attribute, FullnameAttribute)
                 || IsAllPreserveAttribute(attribute);
-        }
-
-        private static bool IsModeledMethodAttribute(XAttribute attribute)
-        {
-            return IsAttribute(attribute, SignatureAttribute);
         }
 
         private static bool IsAllPreserveAttribute(XAttribute attribute)

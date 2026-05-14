@@ -1,0 +1,36 @@
+{
+    "name": "com.dtech.linkguard.editor.zenject",
+    "rootNamespace": "DTech",
+    "references": [
+        "com.dtech.linkguard.editor",
+        "com.dtech.linkguard",
+        "Zenject"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "LinkGuard.Mono.Cecil.dll",
+        "Zenject-usage.dll"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "LINKGUARD_ZENJECT_ENABLED"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.svermeulen.extenject",
+            "expression": "0.0.0",
+            "define": "LINKGUARD_ZENJECT_ENABLED"
+        },
+        {
+            "name": "com.modesttree.zenject",
+            "expression": "0.0.0",
+            "define": "LINKGUARD_ZENJECT_ENABLED"
+        }
+    ],
+    "noEngineReferences": false
+}

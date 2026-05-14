@@ -71,27 +71,11 @@ namespace DTech.LinkGuard.Editor
             if (type.IsSelected)
             {
                 typeElement.Add(new XAttribute("preserve", "all"));
-                LinkXmlPreservation.ApplyToType(typeElement, type);
-
-                return typeElement;
             }
 
             LinkXmlPreservation.ApplyToType(typeElement, type);
 
-            foreach (MethodEntry method in type.Methods.Where(m => m.IsSelected).OrderBy(m => m.Signature))
-            {
-                typeElement.Add(BuildMethodElement(method));
-            }
-
             return typeElement;
-        }
-
-        private static XElement BuildMethodElement(MethodEntry method)
-        {
-            XElement methodElement = new XElement("method", new XAttribute("signature", method.Signature));
-            LinkXmlPreservation.ApplyToMethod(methodElement, method);
-
-            return methodElement;
         }
 
         private static string InsertBlankLineBeforeComments(string xml)
