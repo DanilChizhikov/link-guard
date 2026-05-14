@@ -8,10 +8,6 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using ZN = global::Zenject;
-#if LINKGUARD_ADDRESSABLES_ENABLED
-using UnityEditor.AddressableAssets;
-using UnityEditor.AddressableAssets.Settings;
-#endif
 
 namespace DTech.LinkGuard.Editor.Zenject
 {
@@ -48,9 +44,7 @@ namespace DTech.LinkGuard.Editor.Zenject
                 scenePaths.Add(scene.path);
             }
 
-#if LINKGUARD_ADDRESSABLES_ENABLED
-            CollectAddressableScenes(scenePaths, warnings);
-#endif
+            CollectAdditionalScenes(scenePaths, warnings);
 
             int index = 0;
             int total = scenePaths.Count;
@@ -63,40 +57,28 @@ namespace DTech.LinkGuard.Editor.Zenject
             }
         }
 
-#if LINKGUARD_ADDRESSABLES_ENABLED
-        private static void CollectAddressableScenes(HashSet<string> scenePaths, List<string> warnings)
+        private static void CollectAdditionalScenes(HashSet<string> scenePaths, List<string> warnings)
         {
-            AddressableAssetSettings settings = AddressableAssetSettingsDefaultObject.Settings;
+            TypeCache.TypeCollection candidates = TypeCache.GetTypesDerivedFrom<IZenjectScenePathProvider>();
 
-            if (settings == null)
+            foreach (Type type in candidates)
             {
-                return;
-            }
-
-            foreach (AddressableAssetGroup group in settings.groups)
-            {
-                if (group == null)
+                if (type == null || type.IsAbstract || type.IsInterface)
                 {
                     continue;
                 }
 
-                foreach (AddressableAssetEntry entry in group.entries)
+                try
                 {
-                    if (entry == null || string.IsNullOrEmpty(entry.AssetPath))
-                    {
-                        continue;
-                    }
-
-                    if (!entry.AssetPath.EndsWith(".unity", StringComparison.OrdinalIgnoreCase))
-                    {
-                        continue;
-                    }
-
-                    scenePaths.Add(entry.AssetPath);
+                    IZenjectScenePathProvider provider = (IZenjectScenePathProvider)Activator.CreateInstance(type);
+                    provider.CollectScenePaths(scenePaths, warnings);
+                }
+                catch (Exception ex)
+                {
+                    warnings.Add($"Scene path provider '{type.FullName}' failed: {ex.Message}");
                 }
             }
         }
-#endif
 
         private static void ProcessScene(string path, HashSet<Type> installerTypes, List<string> warnings)
         {
