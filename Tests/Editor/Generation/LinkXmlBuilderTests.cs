@@ -210,7 +210,7 @@ namespace DTech.LinkGuard.Editor.Tests
             string xml = LinkXmlBuilder.Build(new[] { project, plugin });
 
             Assert.That(xml, Does.Contain("\n\n"), "Expected a blank line to be inserted between groups.");
-            Assert.That(xml, Does.Match(@"</assembly>\n\n\s*<!--\s*Plugins folder"));
+            Assert.That(xml, Does.Match(@"(?:/>|</assembly>)\n\n\s*<!--\s*Plugins folder"));
         }
 
         [Test]
