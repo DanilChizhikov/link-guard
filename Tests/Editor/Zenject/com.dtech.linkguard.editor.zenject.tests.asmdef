@@ -16,16 +16,15 @@
     "overrideReferences": true,
     "precompiledReferences": [
         "nunit.framework.dll",
-        "LinkGuard.Mono.Cecil.dll"
+        "LinkGuard.Mono.Cecil.dll",
+        "nunit.framework.dll"
     ],
     "autoReferenced": false,
     "defineConstraints": [
         "UNITY_INCLUDE_TESTS",
-        "LINKGUARD_ZENJECT_ENABLED"
+        "LINKGUARD_ZENJECT_ENABLED",
+        "UNITY_INCLUDE_TESTS"
     ],
     "versionDefines": [],
-    "noEngineReferences": false,
-    "optionalUnityReferences": [
-        "TestAssemblies"
-    ]
+    "noEngineReferences": false
 }
