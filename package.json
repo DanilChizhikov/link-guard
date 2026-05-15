@@ -25,5 +25,9 @@
         "registry": "https://npm.pkg.github.com/@DanilChizhikov"
     },
     "license": "MIT",
-    "readme": "README.md"
+    "readme": "README.md",
+    "testables": [
+        "com.dtech.linkguard.editor.tests",
+        "com.dtech.linkguard.editor.zenject.tests"
+    ]
 }
