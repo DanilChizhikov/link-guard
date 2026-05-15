@@ -12,7 +12,7 @@ on:
 
 jobs:
   testPlayMode:
-    name: Test PlayMode
+    name: Test EditMode
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -21,16 +21,16 @@ jobs:
           - empty-unity-project
 
     steps:
-      - name: Checkout logging repo
+      - name: Checkout repo
         uses: actions/checkout@v4
 
       - name: Clone empty Unity project
         run: |
           git clone https://DanilChizhikov:${{ secrets.PRIVATE_REPO_TOKEN }}@github.com/DanilChizhikov/empty-unity-project.git empty-unity-project
 
-      - name: Copy logging source into Unity project
+      - name: Copy source into Unity project
         run: |
-          mkdir -p ${{ matrix.projectPath }}/Assets/logging
+          mkdir -p ${{ matrix.projectPath }}/Assets/sources
 
           shopt -s dotglob
 
@@ -40,7 +40,7 @@ jobs:
                 echo "Skipping $item"
                 ;;
               *)
-                cp -R "$item" ${{ matrix.projectPath }}/Assets/logging/
+                cp -R "$item" ${{ matrix.projectPath }}/Assets/sources/
                 ;;
             esac
           done
@@ -54,4 +54,4 @@ jobs:
         with:
           unityVersion: 2022.3.62f2
           projectPath: ${{ matrix.projectPath }}
-          testMode: playmode
+          testMode: editmode
