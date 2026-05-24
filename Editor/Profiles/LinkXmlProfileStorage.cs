@@ -67,64 +67,39 @@ namespace DTech.LinkGuard.Editor
                 return false;
             }
 
-            string json;
-
-            try
-            {
-                json = File.ReadAllText(path);
-            }
-            catch (Exception ex)
-            {
-                if (showDialogs)
-                {
-                    EditorUtility.DisplayDialog("Load Profile", $"Failed to read profile: {ex.Message}", "OK");
-                }
-                else
-                {
-                    Debug.LogWarning($"[LinkXmlGenerator] Failed to read profile at {path}: {ex.Message}");
-                }
-
-                return false;
-            }
-
             LinkXmlProfile profile;
 
             try
             {
+                string json = File.ReadAllText(path);
                 profile = JsonUtility.FromJson<LinkXmlProfile>(json);
+
+                if (profile == null || profile.Selections == null)
+                {
+                    return ReportLoadFailure(path, "Profile is empty or invalid.", showDialogs);
+                }
             }
             catch (Exception ex)
             {
-                if (showDialogs)
-                {
-                    EditorUtility.DisplayDialog("Load Profile", $"Failed to parse profile: {ex.Message}", "OK");
-                }
-                else
-                {
-                    Debug.LogWarning($"[LinkXmlGenerator] Failed to parse profile at {path}: {ex.Message}");
-                }
-
-                return false;
-            }
-
-            if (profile == null || profile.Selections == null)
-            {
-                if (showDialogs)
-                {
-                    EditorUtility.DisplayDialog("Load Profile", "Profile is empty or invalid.", "OK");
-                }
-                else
-                {
-                    Debug.LogWarning($"[LinkXmlGenerator] Profile at {path} is empty or invalid.");
-                }
-
-                return false;
+                return ReportLoadFailure(path, $"Failed to load profile: {ex.Message}", showDialogs);
             }
 
             ApplyProfile(profile, entries);
             Debug.Log($"[LinkXmlGenerator] Profile loaded from {path}");
 
             return true;
+        }
+
+        private static bool ReportLoadFailure(string path, string message, bool showDialogs)
+        {
+            Debug.LogError($"[LinkXmlGenerator] {message} (path: {path})");
+
+            if (showDialogs)
+            {
+                EditorUtility.DisplayDialog("Load Profile", message, "OK");
+            }
+
+            return false;
         }
 
         private static LinkXmlProfile ToProfile(IReadOnlyList<AssemblyEntry> entries)
