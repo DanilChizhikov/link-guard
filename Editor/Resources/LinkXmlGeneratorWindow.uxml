@@ -19,7 +19,7 @@
         </uie:Toolbar>
 
         <ui:VisualElement name="content-area" class="lxg-content">
-            <ui:TwoPaneSplitView name="splitter" orientation="Vertical"
+            <ui:TwoPaneSplitView name="splitter" class="lxg-splitter" orientation="Vertical"
                                  fixed-pane-index="1"
                                  fixed-pane-initial-dimension="220">
                 <ui:VisualElement name="tree-host" class="lxg-tree-host">
