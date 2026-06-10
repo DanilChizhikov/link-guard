@@ -132,6 +132,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
             content.AddToClassList("lxg-content");
 
             _splitter = new TwoPaneSplitView(1, 220f, TwoPaneSplitViewOrientation.Vertical);
+            _splitter.AddToClassList("lxg-splitter");
 
             VisualElement treeHost = new VisualElement();
             treeHost.AddToClassList("lxg-tree-host");
