@@ -73,6 +73,24 @@ namespace DTech.LinkGuard.Editor.ProGuard.Tests
         }
 
         [Test]
+        public void Build_ChildDeselectedAfterArtifactSelection_DoesNotEmitArtifactWideRule()
+        {
+            AndroidArtifactEntry entry = MakeEntry("lib.aar", AndroidArtifactSource.Aar,
+                MakeClass("com.foo", "A"), MakeClass("com.foo", "B"));
+            entry.SelectAll(true);
+            entry.IsArtifactSelected = false;
+            entry.Classes.Single(c => c.DisplayName == "A").SelectAll(false);
+
+            List<string> rules = Lines(ProGuardRulesBuilder.Build(new[] { entry }))
+                .Where(l => l.StartsWith("-keep"))
+                .ToList();
+
+            Assert.That(rules, Does.Not.Contain("-keep class com.foo.** { *; }"));
+            Assert.That(rules, Does.Not.Contain("-keep class com.foo.A { *; }"));
+            Assert.That(rules, Does.Contain("-keep class com.foo.B { *; }"));
+        }
+
+        [Test]
         public void Build_GroupsBySource_InAarThenJarOrder()
         {
             JavaClassEntry aarClass = MakeClass("com.aar", "A");

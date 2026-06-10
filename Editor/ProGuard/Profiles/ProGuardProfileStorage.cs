@@ -87,7 +87,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
             return true;
         }
 
-        private static ProGuardProfile ToProfile(IReadOnlyList<AndroidArtifactEntry> entries)
+        internal static ProGuardProfile ToProfile(IReadOnlyList<AndroidArtifactEntry> entries)
         {
             ProGuardProfile profile = new ProGuardProfile { Version = 1 };
 
@@ -101,6 +101,8 @@ namespace DTech.LinkGuard.Editor.ProGuard
                 profile.Selections.Add(new ProGuardSelection
                 {
                     Artifact = entry.Name,
+                    Source = entry.Source,
+                    OriginPath = entry.OriginPath,
                     KeepAll = entry.IsArtifactSelected,
                     Packages = entry.Packages
                         .Where(p => p.IsSelected && !string.IsNullOrEmpty(p.Fullname))
@@ -116,11 +118,15 @@ namespace DTech.LinkGuard.Editor.ProGuard
             return profile;
         }
 
-        private static void ApplyProfile(ProGuardProfile profile, List<AndroidArtifactEntry> entries)
+        internal static void ApplyProfile(ProGuardProfile profile, List<AndroidArtifactEntry> entries)
         {
-            Dictionary<string, AndroidArtifactEntry> byName = entries
-                .GroupBy(e => e.Name, StringComparer.Ordinal)
+            Dictionary<string, AndroidArtifactEntry> byStableKey = entries
+                .GroupBy(GetStableKey, StringComparer.Ordinal)
                 .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+
+            Dictionary<string, List<AndroidArtifactEntry>> byName = entries
+                .GroupBy(e => e.Name, StringComparer.Ordinal)
+                .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.Ordinal);
 
             foreach (AndroidArtifactEntry entry in entries)
             {
@@ -129,17 +135,15 @@ namespace DTech.LinkGuard.Editor.ProGuard
 
             foreach (ProGuardSelection selection in profile.Selections)
             {
-                if (string.IsNullOrEmpty(selection.Artifact))
+                if (!TryGetEntry(selection, byStableKey, byName, out AndroidArtifactEntry entry))
                 {
                     continue;
                 }
 
-                if (!byName.TryGetValue(selection.Artifact, out AndroidArtifactEntry entry))
+                if (selection.KeepAll)
                 {
-                    continue;
+                    entry.SelectAll(true);
                 }
-
-                entry.IsArtifactSelected = selection.KeepAll;
 
                 HashSet<string> wantedPackages = selection.Packages == null
                     ? new HashSet<string>(StringComparer.Ordinal)
@@ -165,6 +169,40 @@ namespace DTech.LinkGuard.Editor.ProGuard
                     }
                 }
             }
+        }
+
+        private static bool TryGetEntry(ProGuardSelection selection,
+            Dictionary<string, AndroidArtifactEntry> byStableKey,
+            Dictionary<string, List<AndroidArtifactEntry>> byName,
+            out AndroidArtifactEntry entry)
+        {
+            entry = null;
+
+            if (!string.IsNullOrEmpty(selection.OriginPath)
+                && byStableKey.TryGetValue(GetStableKey(selection.Source, selection.OriginPath), out entry))
+            {
+                return true;
+            }
+
+            if (string.IsNullOrEmpty(selection.Artifact)
+                || !byName.TryGetValue(selection.Artifact, out List<AndroidArtifactEntry> namedEntries)
+                || namedEntries.Count != 1)
+            {
+                return false;
+            }
+
+            entry = namedEntries[0];
+            return true;
+        }
+
+        private static string GetStableKey(AndroidArtifactEntry entry)
+        {
+            return GetStableKey(entry.Source, entry.OriginPath);
+        }
+
+        private static string GetStableKey(AndroidArtifactSource source, string originPath)
+        {
+            return ((int)source).ToString() + "|" + (originPath ?? string.Empty);
         }
     }
 }

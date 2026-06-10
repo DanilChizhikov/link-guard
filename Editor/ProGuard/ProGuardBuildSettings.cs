@@ -39,7 +39,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
 
                 if (property.boolValue)
                 {
-                    return false;
+                    return true;
                 }
 
                 property.boolValue = true;

@@ -361,7 +361,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
             toggle.style.display = DisplayStyle.Flex;
             toggle.SetValueWithoutNotify(package.IsSelected);
             toggle.RegisterValueChangedCallback(_packageToggleCallback);
-            toggle.userData = package;
+            toggle.userData = SelectionToggleContext.ForPackage(node.Artifact, package);
 
             if (string.IsNullOrEmpty(package.Fullname))
             {
@@ -386,7 +386,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
             toggle.style.display = DisplayStyle.Flex;
             toggle.SetValueWithoutNotify(javaClass.IsSelected);
             toggle.RegisterValueChangedCallback(_classToggleCallback);
-            toggle.userData = javaClass;
+            toggle.userData = SelectionToggleContext.ForClass(node.Artifact, javaClass);
 
             label.text = HighlightMatch(javaClass.DisplayName);
 
@@ -447,29 +447,33 @@ namespace DTech.LinkGuard.Editor.ProGuard
                 return;
             }
 
-            entry.IsArtifactSelected = evt.newValue;
+            entry.SelectAll(evt.newValue);
             FindController(toggle)?.HandleSelectionChanged();
         }
 
         private static void PackageToggleHandler(ChangeEvent<bool> evt)
         {
-            if (evt.target is not Toggle toggle || toggle.userData is not JavaPackageEntry package)
+            if (evt.target is not Toggle toggle || toggle.userData is not SelectionToggleContext context
+                || context.Package == null)
             {
                 return;
             }
 
-            package.IsSelected = evt.newValue;
+            context.Artifact.IsArtifactSelected = false;
+            context.Package.IsSelected = evt.newValue;
             FindController(toggle)?.HandleSelectionChanged();
         }
 
         private static void ClassToggleHandler(ChangeEvent<bool> evt)
         {
-            if (evt.target is not Toggle toggle || toggle.userData is not JavaClassEntry javaClass)
+            if (evt.target is not Toggle toggle || toggle.userData is not SelectionToggleContext context
+                || context.Class == null)
             {
                 return;
             }
 
-            javaClass.SelectAll(evt.newValue);
+            context.Artifact.IsArtifactSelected = false;
+            context.Class.SelectAll(evt.newValue);
             FindController(toggle)?.HandleSelectionChanged();
         }
 
@@ -494,6 +498,32 @@ namespace DTech.LinkGuard.Editor.ProGuard
         {
             _tree.RefreshItems();
             OnChanged?.Invoke();
+        }
+
+        private sealed class SelectionToggleContext
+        {
+            public AndroidArtifactEntry Artifact { get; }
+            public JavaPackageEntry Package { get; }
+            public JavaClassEntry Class { get; }
+
+            private SelectionToggleContext(AndroidArtifactEntry artifact,
+                JavaPackageEntry package,
+                JavaClassEntry javaClass)
+            {
+                Artifact = artifact;
+                Package = package;
+                Class = javaClass;
+            }
+
+            public static SelectionToggleContext ForPackage(AndroidArtifactEntry artifact, JavaPackageEntry package)
+            {
+                return new SelectionToggleContext(artifact, package, null);
+            }
+
+            public static SelectionToggleContext ForClass(AndroidArtifactEntry artifact, JavaClassEntry javaClass)
+            {
+                return new SelectionToggleContext(artifact, null, javaClass);
+            }
         }
     }
 }

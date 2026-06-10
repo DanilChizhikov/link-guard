@@ -24,17 +24,16 @@ namespace DTech.LinkGuard.Editor.ProGuard
                 return false;
             }
 
-            Write(text, normalized);
-            return true;
+            return Write(text, normalized);
         }
 
-        public static void Write(string text, string targetPath = DefaultPath)
+        public static bool Write(string text, string targetPath = DefaultPath)
         {
             if (!ProGuardBuildSettings.EnableCustomProguardFile())
             {
-                return;
+                return false;
             }
-            
+
             string normalized = string.IsNullOrEmpty(targetPath) ? DefaultPath : targetPath;
             string directory = Path.GetDirectoryName(normalized);
 
@@ -55,6 +54,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
             }
 
             Debug.Log($"[LinkGuard] [proguard] rules written to {normalized}");
+            return true;
         }
     }
 }

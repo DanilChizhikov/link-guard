@@ -27,7 +27,14 @@ namespace DTech.LinkGuard.Editor.ProGuard
             }
 
             string text = ProGuardRulesBuilder.Build(entries);
-            ProGuardWriter.Write(text, target);
+            if (!ProGuardWriter.Write(text, target))
+            {
+                ProGuardPatchReport failed = new ProGuardPatchReport(
+                    target, 0, entries.Count(e => e.ProducesEntry), entries.Sum(e => e.ClassCount), true,
+                    "Could not write ProGuard rules. Enable 'Custom Proguard File' manually and try again.");
+                Debug.LogWarning($"[LinkGuard] {failed}");
+                return failed;
+            }
 
             ProGuardPatchReport report = new ProGuardPatchReport(
                 target,

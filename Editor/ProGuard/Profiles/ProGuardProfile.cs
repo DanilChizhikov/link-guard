@@ -7,6 +7,8 @@ namespace DTech.LinkGuard.Editor.ProGuard
     internal sealed class ProGuardSelection
     {
         public string Artifact;
+        public AndroidArtifactSource Source;
+        public string OriginPath;
         public bool KeepAll;
         public List<string> Packages = new();
         public List<string> Classes = new();
