@@ -103,7 +103,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
                     continue;
                 }
 
-                if (package.IsSelected && !string.IsNullOrEmpty(package.Fullname))
+                if (package.IsSelected && package.Classes.Count > 1 && !string.IsNullOrEmpty(package.Fullname))
                 {
                     yield return PackageRule(package.Fullname);
                     continue;
