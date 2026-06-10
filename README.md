@@ -6,6 +6,10 @@ Link Guard is a Unity editor tool for building `link.xml` files used by managed 
 It scans project assemblies, plugins, UPM packages, known SDKs, and Unity modules, then lets you choose which
 assemblies or types should be preserved.
 
+The editor window is a modular tab host. Alongside the `link.xml` tab, a **ProGuard** tab scans Android artifacts
+(`.aar`, `.androidlib`, `.jar`, and Java/Kotlin sources) and generates `-keep` rules for the Android R8/ProGuard
+shrinker — the native-side counterpart of `link.xml`.
+
 ## Table of Contents
 - [Getting Started](#getting-started)
     - [Prerequisites](#prerequisites)
@@ -21,6 +25,7 @@ assemblies or types should be preserved.
     - [Custom SDK Groups](#custom-sdk-groups)
     - [Custom Merge Providers](#custom-merge-providers)
     - [Zenject Module](#zenject-module)
+    - [ProGuard Rules](#proguard-rules)
 - [License](#license)
 
 ## Getting Started
@@ -57,13 +62,16 @@ For example `https://github.com/DanilChizhikov/link-guard.git#v1.0.0`.
 - Preserve unknown entries and custom XML attributes when importing or merging
 - `ignoreIfMissing` support for assembly entries
 - Custom SDK grouping through `IKnownSdkProvider`
+- ProGuard/R8 keep-rule generation from scanned Android artifacts (`.aar`, `.androidlib`, `.jar`, Java/Kotlin sources)
+- Modular tabs discovered through `IGeneratorTab` / `TypeCache`
 
 ## Usage
 
 ### Open the Window
-Open `Window/DTech/Link XML Generator`.
+Open `Window/DTech/Link Guard` (the legacy `Window/DTech/Link XML Generator` menu opens the same window).
+The window hosts two tabs: **link.xml** and **ProGuard**.
 
-Press `Refresh` to scan assemblies. The tree is grouped by source:
+On the `link.xml` tab, press `Refresh` to scan assemblies. The tree is grouped by source:
 
 - Project assemblies
 - Plugins folder
@@ -204,6 +212,50 @@ internal sealed class ZenjectLinkXmlBuildHook : IPreprocessBuildWithReport
 `ZenjectLinkXmlPatcher.Patch(linkXmlPath)` loads the existing `link.xml` (or creates one), runs the same scan
 as the toolbar button, and writes the merged document back. It does not show any dialogs and does not register
 itself as a build callback — opt in from your own build script.
+
+### ProGuard Rules
+Switch to the **ProGuard** tab to generate Android R8/ProGuard `-keep` rules. ProGuard shrinks Java/Kotlin code, so
+this tab scans Android artifacts rather than managed assemblies:
+
+- `.aar` plugins (including their nested `classes.jar` and `libs/*.jar`)
+- `.androidlib` folders
+- standalone `.jar` plugins
+- loose Java/Kotlin sources under Android plugin folders
+
+Press `Refresh`, select artifacts, packages, or classes to keep, then press `Generate ProGuard`. A class selection
+becomes `-keep class <fqcn> { *; }`, a package becomes `-keep class <package>.** { *; }`, and a whole artifact
+collapses to one rule per root package.
+
+The rules are written to `Assets/Plugins/Android/proguard-user.txt` and `PlayerSettings.Android.useCustomProguardFile`
+is enabled so Unity feeds the file to the build automatically.
+
+The `Generate ProGuard` button is shown only when the **active build target is Android**. A notice is displayed when
+Android minification (R8) is disabled in Player Settings — rules are still generated but are not applied until you
+enable Minify.
+
+#### Build-time API (ProGuard)
+For automated pipelines, call the patcher from a custom build hook:
+
+```csharp
+using DTech.LinkGuard.Editor.ProGuard;
+using UnityEditor.Build;
+using UnityEditor.Build.Reporting;
+
+internal sealed class ProGuardBuildHook : IPreprocessBuildWithReport
+{
+    public int callbackOrder => 0;
+
+    public void OnPreprocessBuild(BuildReport report)
+    {
+        ProGuardPatchReport patchReport = ProGuardPatcher.Patch();
+        UnityEngine.Debug.Log(patchReport);
+    }
+}
+```
+
+`ProGuardPatcher.Patch(path)` scans every Android artifact, keeps all discovered classes, and writes the rules file.
+It does not show any dialogs, does not register itself as a build callback, and skips with a log when Android
+minification is disabled.
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

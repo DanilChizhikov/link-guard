@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.0] - 2026-06-09
+
+### Added
+- ProGuard/R8 support: new **ProGuard** tab in the generator window that scans Android artifacts (`.aar`, `.androidlib`, `.jar`, and Java/Kotlin sources) into an artifact → package → class tree and generates `-keep` rules
+- Generated rules are written to `Assets/Plugins/Android/proguard-user.txt` and `PlayerSettings.Android.useCustomProguardFile` is enabled automatically
+- The **Generate ProGuard** button is shown only when the active build target is Android; a notice is displayed when minification (R8) is disabled
+- Public build-time API `DTech.LinkGuard.Editor.ProGuard.ProGuardPatcher.Patch(path)` for invocation from `IPreprocessBuildWithReport`; it keeps all scanned Android classes and skips when minification is disabled
+- ProGuard selection profiles (save/load JSON), mirroring the link.xml profiles
+
+### Changed
+- The editor window is now a modular tab host (`Window/DTech/Link Guard`); `link.xml` and `ProGuard` are tabs discovered through `IGeneratorTab` / `TypeCache`. The legacy `Window/DTech/Link XML Generator` menu opens the same window
+- ProGuard lives in a separate optional assembly (`com.dtech.linkguard.editor.proguard`); the core window has no Android or ProGuard dependencies
+
 ## [1.1.0] - 2026-05-13
 
 ### Added

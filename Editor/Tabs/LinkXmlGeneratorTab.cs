@@ -8,9 +8,8 @@ using UnityEngine.UIElements;
 
 namespace DTech.LinkGuard.Editor
 {
-    internal sealed class LinkXmlGeneratorWindow : EditorWindow
+    internal sealed class LinkXmlGeneratorTab : IGeneratorTab
     {
-        private const string MenuPath = "Window/DTech/" + Title;
         private const string UxmlName = "LinkXmlGeneratorWindow";
         private const string USSName = "LinkXmlGeneratorWindow";
         private const string ShowPreviewKey = "LinkXmlGenerator.ShowPreview";
@@ -18,6 +17,11 @@ namespace DTech.LinkGuard.Editor
         private const string Title = "Link XML Generator";
         private const float DefaultPreviewHeight = 220f;
 
+        public string TabLabel => "link.xml";
+        public int Order => 0;
+        public bool IsAvailable => true;
+
+        private VisualElement _root;
         private List<AssemblyEntry> _entries = new();
         private AssemblyTreeController _treeController;
         private PreviewPanel _previewPanel;
@@ -30,31 +34,25 @@ namespace DTech.LinkGuard.Editor
         private bool _showPreview;
         private bool _previewDirty;
 
-        [MenuItem(MenuPath)]
-        public static void Open()
+        public VisualElement CreateView()
         {
-            LinkXmlGeneratorWindow window = GetWindow<LinkXmlGeneratorWindow>();
-            window.titleContent = new GUIContent(Title);
-            window.minSize = new Vector2(640f, 480f);
-            window.Show();
-        }
+            _root = new VisualElement();
+            _root.style.flexGrow = 1f;
 
-        public void CreateGUI()
-        {
             VisualTreeAsset tree = Resources.Load<VisualTreeAsset>(UxmlName);
             StyleSheet styles = Resources.Load<StyleSheet>(USSName);
 
             if (tree == null)
             {
-                rootVisualElement.Add(new Label($"Failed to load UXML at {UxmlName}"));
-                return;
+                _root.Add(new Label($"Failed to load UXML at {UxmlName}"));
+                return _root;
             }
 
-            tree.CloneTree(rootVisualElement);
+            tree.CloneTree(_root);
 
             if (styles != null)
             {
-                rootVisualElement.styleSheets.Add(styles);
+                _root.styleSheets.Add(styles);
             }
 
             CacheElements();
@@ -67,11 +65,13 @@ namespace DTech.LinkGuard.Editor
             {
                 EditorApplication.delayCall += Refresh;
             }
+
+            return _root;
         }
 
         private void CacheElements()
         {
-            VisualElement root = rootVisualElement;
+            VisualElement root = _root;
 
             ToolbarButton refreshBtn = root.Q<ToolbarButton>("btn-refresh");
             ToolbarButton selectAllBtn = root.Q<ToolbarButton>("btn-select-all");
@@ -283,6 +283,7 @@ namespace DTech.LinkGuard.Editor
 
             _showPreview = true;
             _previewToggle.SetValueWithoutNotify(true);
+            EditorPrefs.SetBool(ShowPreviewKey, _showPreview);
             ApplyShowPreview();
         }
 
@@ -356,17 +357,8 @@ namespace DTech.LinkGuard.Editor
             {
                 RebuildPreview();
             }
-            
-            _generateButton.SetEnabled(HasAnySelection());
-        }
 
-        private void OnDisable()
-        {
-            EditorPrefs.SetBool(ShowPreviewKey, _showPreview);
-            if (_previewHost != null && _previewHost.resolvedStyle.height > 0f)
-            {
-                EditorPrefs.SetFloat(SplitPxKey, _previewHost.resolvedStyle.height);
-            }
+            _generateButton.SetEnabled(HasAnySelection());
         }
 
         private void SelectionChangedHandler()
@@ -410,6 +402,7 @@ namespace DTech.LinkGuard.Editor
         private void PreviewToggleChangedHandler(ChangeEvent<bool> evt)
         {
             _showPreview = evt.newValue;
+            EditorPrefs.SetBool(ShowPreviewKey, _showPreview);
             ApplyShowPreview();
             if (_showPreview && !_previewPanel.HasContent)
             {
