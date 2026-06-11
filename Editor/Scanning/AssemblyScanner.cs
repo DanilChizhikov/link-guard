@@ -44,6 +44,12 @@ namespace DTech.LinkGuard.Editor
                 result.Add(new AssemblyEntry(assembly.name, source, originPath, types));
             }
 
+            HashSet<string> compiledNames = new HashSet<string>(
+                compilationAssemblies.Select(a => a.name),
+                StringComparer.Ordinal);
+
+            result.AddRange(DisabledAssemblyScanner.Scan(compiledNames, sourceResolver, reportProgress));
+
             result.Sort((a, b) =>
             {
                 int cmp = ((int)a.Source).CompareTo((int)b.Source);

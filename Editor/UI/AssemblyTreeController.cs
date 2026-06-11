@@ -12,6 +12,8 @@ namespace DTech.LinkGuard.Editor
         private const string RowClass = "lxg-row";
         private const string GroupLabelClass = "lxg-group-label";
         private const string GlobalLabelClass = "lxg-global-label";
+        private const string DisabledLabelClass = "lxg-row-disabled";
+        private const string DisabledSuffixColor = "#9A9A9A";
         private const string RowToggleClass = "lxg-row-toggle";
         private const string RowLabelClass = "lxg-row-label";
         private const string RowMetaClass = "lxg-row-meta";
@@ -292,6 +294,8 @@ namespace DTech.LinkGuard.Editor
             toggle.SetEnabled(true);
             label.RemoveFromClassList(GroupLabelClass);
             label.RemoveFromClassList(GlobalLabelClass);
+            label.RemoveFromClassList(DisabledLabelClass);
+            label.tooltip = string.Empty;
 
             switch (node.Kind)
             {
@@ -366,6 +370,7 @@ namespace DTech.LinkGuard.Editor
             toggle.userData = entry;
 
             label.text = HighlightMatch(entry.Name);
+            ApplyDisabledState(label, entry, appendSuffix: true);
 
             if (entry.TypeCount > 0)
             {
@@ -405,6 +410,8 @@ namespace DTech.LinkGuard.Editor
                 label.text = HighlightMatch(ns.Fullname);
             }
 
+            ApplyDisabledState(label, node.Assembly, appendSuffix: false);
+
             meta.style.display = DisplayStyle.Flex;
             meta.text = $"[{ns.SelectedTypeCount}/{ns.Types.Count} types]";
 
@@ -423,6 +430,7 @@ namespace DTech.LinkGuard.Editor
             toggle.userData = type;
 
             label.text = HighlightMatch(type.DisplayName);
+            ApplyDisabledState(label, node.Assembly, appendSuffix: false);
 
             meta.style.display = DisplayStyle.None;
 
@@ -457,6 +465,27 @@ namespace DTech.LinkGuard.Editor
             string after = source.Substring(matchIndex + _search.Length);
 
             return string.Concat(before, HighlightOpen, match, HighlightClose, after);
+        }
+
+        private static void ApplyDisabledState(Label label, AssemblyEntry entry, bool appendSuffix)
+        {
+            if (entry == null || !entry.IsDisabledByDefine)
+            {
+                return;
+            }
+
+            label.AddToClassList(DisabledLabelClass);
+
+            string defines = entry.RequiredDefines != null && entry.RequiredDefines.Count > 0
+                ? string.Join(", ", entry.RequiredDefines)
+                : "?";
+
+            label.tooltip = $"Excluded from compilation; asmdef requires define: {defines}";
+
+            if (appendSuffix)
+            {
+                label.text += $" <color={DisabledSuffixColor}><i>(define off: {defines})</i></color>";
+            }
         }
 
         private static string GetGroupLabel(AssemblySource source)
