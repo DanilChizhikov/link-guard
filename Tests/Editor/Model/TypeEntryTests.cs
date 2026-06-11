@@ -4,7 +4,7 @@ using NUnit.Framework;
 namespace DTech.LinkGuard.Editor.Tests
 {
     [TestFixture]
-    public sealed class TypeEntryTests
+    internal sealed class TypeEntryTests
     {
         [Test]
         public void Ctor_DefaultsToNotSelectedAndNonSynthetic()

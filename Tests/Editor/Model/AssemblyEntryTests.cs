@@ -6,7 +6,7 @@ using NUnit.Framework;
 namespace DTech.LinkGuard.Editor.Tests
 {
     [TestFixture]
-    public sealed class AssemblyEntryTests
+    internal sealed class AssemblyEntryTests
     {
         private static TypeEntry MakeType(string ns, string name, bool selected = false)
         {

@@ -6,7 +6,7 @@ using NUnit.Framework;
 namespace DTech.LinkGuard.Editor.Tests
 {
     [TestFixture]
-    public sealed class LinkXmlPreservationTests
+    internal sealed class LinkXmlPreservationTests
     {
         [SetUp]
         public void SetUp()

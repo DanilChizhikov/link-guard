@@ -5,7 +5,7 @@ using NUnit.Framework;
 namespace DTech.LinkGuard.Editor.Tests
 {
     [TestFixture]
-    public sealed class SourceTypeExtractorTests
+    internal sealed class SourceTypeExtractorTests
     {
         private static List<string> LinkerNames(string source)
         {

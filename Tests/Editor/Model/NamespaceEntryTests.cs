@@ -4,17 +4,8 @@ using NUnit.Framework;
 namespace DTech.LinkGuard.Editor.Tests
 {
     [TestFixture]
-    public sealed class NamespaceEntryTests
+    internal sealed class NamespaceEntryTests
     {
-        private static TypeEntry MakeType(string linkerFullname, bool selected = false)
-        {
-            TypeEntry type = new TypeEntry("Ns", linkerFullname, linkerFullname, linkerFullname)
-            {
-                IsSelected = selected
-            };
-            return type;
-        }
-
         [Test]
         public void Ctor_NullFullname_NormalizesToEmptyString()
         {
@@ -119,6 +110,15 @@ namespace DTech.LinkGuard.Editor.Tests
                 });
 
             Assert.That(ns.SelectedTypeCount, Is.EqualTo(2));
+        }
+        
+        private static TypeEntry MakeType(string linkerFullname, bool selected = false)
+        {
+            TypeEntry type = new TypeEntry("Ns", linkerFullname, linkerFullname, linkerFullname)
+            {
+                IsSelected = selected
+            };
+            return type;
         }
     }
 }

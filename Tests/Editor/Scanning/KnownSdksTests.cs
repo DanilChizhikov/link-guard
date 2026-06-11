@@ -1,11 +1,9 @@
-using System.Collections.Generic;
-using System.Text.RegularExpressions;
 using NUnit.Framework;
 
 namespace DTech.LinkGuard.Editor.Tests
 {
     [TestFixture]
-    public sealed class KnownSdksTests
+    internal sealed class KnownSdksTests
     {
         [TestCase("Firebase")]
         [TestCase("Firebase.Auth")]
@@ -55,18 +53,9 @@ namespace DTech.LinkGuard.Editor.Tests
         [Test]
         public void IsSdk_CustomProvider_IsDiscoveredViaTypeCache()
         {
-            // TestKnownSdkProvider below is auto-discovered via TypeCache.
             KnownSdks sdks = new KnownSdks();
             Assert.That(sdks.IsSdk("Test_LinkGuard_Marker_42"), Is.True);
             Assert.That(sdks.IsSdk("Test_LinkGuard_Marker_X"), Is.False);
-        }
-    }
-
-    public sealed class TestKnownSdkProvider : IKnownSdkProvider
-    {
-        public IEnumerable<Regex> GetSdkPatterns()
-        {
-            yield return new Regex(@"^Test_LinkGuard_Marker_\d+$");
         }
     }
 }

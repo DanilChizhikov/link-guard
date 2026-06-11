@@ -3,7 +3,7 @@ using NUnit.Framework;
 namespace DTech.LinkGuard.Editor.Tests
 {
     [TestFixture]
-    public sealed class SystemAssemblyFilterTests
+    internal sealed class SystemAssemblyFilterTests
     {
         [TestCase("System")]
         [TestCase("System.Linq")]
@@ -63,8 +63,6 @@ namespace DTech.LinkGuard.Editor.Tests
         [Test]
         public void ShouldExclude_NamesThatHappenToShareSystemPrefix_AreAlsoExcluded()
         {
-            // The filter is a deliberate prefix match — this locks down the behavior so future
-            // refactors don't silently change the contract.
             Assert.That(SystemAssemblyFilter.ShouldExclude("Systematic"), Is.True);
         }
     }

@@ -3,7 +3,7 @@ using NUnit.Framework;
 namespace DTech.LinkGuard.Editor.ProGuard.Tests
 {
     [TestFixture]
-    public sealed class JavaClassNameResolverTests
+    internal sealed class JavaClassNameResolverTests
     {
         [Test]
         public void TryResolveClassEntry_TopLevelClass_ResolvesFullnameAndPackage()

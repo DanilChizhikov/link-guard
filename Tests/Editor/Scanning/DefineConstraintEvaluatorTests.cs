@@ -5,13 +5,8 @@ using NUnit.Framework;
 namespace DTech.LinkGuard.Editor.Tests
 {
     [TestFixture]
-    public sealed class DefineConstraintEvaluatorTests
+    internal sealed class DefineConstraintEvaluatorTests
     {
-        private static HashSet<string> Defines(params string[] symbols)
-        {
-            return new HashSet<string>(symbols, StringComparer.Ordinal);
-        }
-
         [Test]
         public void GetUnsatisfied_NullOrEmptyConstraints_ReturnsEmpty()
         {
@@ -108,6 +103,11 @@ namespace DTech.LinkGuard.Editor.Tests
         {
             Assert.That(DefineConstraintEvaluator.ParseDefines(null), Is.Empty);
             Assert.That(DefineConstraintEvaluator.ParseDefines(string.Empty), Is.Empty);
+        }
+        
+        private static HashSet<string> Defines(params string[] symbols)
+        {
+            return new HashSet<string>(symbols, StringComparer.Ordinal);
         }
     }
 }

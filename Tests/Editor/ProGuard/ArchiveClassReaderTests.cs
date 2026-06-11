@@ -6,7 +6,7 @@ using NUnit.Framework;
 namespace DTech.LinkGuard.Editor.ProGuard.Tests
 {
     [TestFixture]
-    public sealed class ArchiveClassReaderTests
+    internal sealed class ArchiveClassReaderTests
     {
         [Test]
         public void ReadClassEntryPaths_Jar_ReturnsOnlyClassEntries()
