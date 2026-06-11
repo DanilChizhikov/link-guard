@@ -7,7 +7,7 @@ using UnityEngine.TestTools;
 namespace DTech.LinkGuard.Editor.Tests
 {
     [TestFixture]
-    public sealed class LinkXmlSelectionImporterTests
+    internal sealed class LinkXmlSelectionImporterTests
     {
         [SetUp]
         public void SetUp()

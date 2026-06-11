@@ -5,7 +5,7 @@ using NUnit.Framework;
 namespace DTech.LinkGuard.Editor.Zenject.Tests
 {
     [TestFixture]
-    public sealed class ZenjectIgnoreFilterTests
+    internal sealed class ZenjectIgnoreFilterTests
     {
         private class PlainType
         {

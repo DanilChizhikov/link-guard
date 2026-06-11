@@ -14,14 +14,27 @@ namespace DTech.LinkGuard.Editor
 
         public AssemblySource Resolve(CompilationAssembly assembly)
         {
-            if (_sdks.IsSdk(assembly.name))
+            string firstSource = assembly.sourceFiles != null && assembly.sourceFiles.Length > 0
+                ? assembly.sourceFiles[0]
+                : string.Empty;
+
+            return Resolve(assembly.name, firstSource);
+        }
+
+        /// <summary>
+        /// Resolves the source group from an assembly name and a representative source path (e.g. the
+        /// first source file, or the .asmdef path for assemblies that are not currently compiled).
+        /// </summary>
+        public AssemblySource Resolve(string assemblyName, string firstSourcePath)
+        {
+            if (_sdks.IsSdk(assemblyName))
             {
                 return AssemblySource.Sdk;
             }
 
-            string firstSource = assembly.sourceFiles != null && assembly.sourceFiles.Length > 0
-                ? assembly.sourceFiles[0].Replace('\\', '/')
-                : string.Empty;
+            string firstSource = string.IsNullOrEmpty(firstSourcePath)
+                ? string.Empty
+                : firstSourcePath.Replace('\\', '/');
 
             if (firstSource.StartsWith("Packages/", System.StringComparison.OrdinalIgnoreCase))
             {
@@ -33,9 +46,10 @@ namespace DTech.LinkGuard.Editor
                 return AssemblySource.Plugin;
             }
 
-            if (assembly.name.StartsWith("Unity.", System.StringComparison.Ordinal)
-                || assembly.name.StartsWith("UnityEngine.", System.StringComparison.Ordinal)
-                || assembly.name.StartsWith("UnityEditor.", System.StringComparison.Ordinal))
+            if (assemblyName != null
+                && (assemblyName.StartsWith("Unity.", System.StringComparison.Ordinal)
+                    || assemblyName.StartsWith("UnityEngine.", System.StringComparison.Ordinal)
+                    || assemblyName.StartsWith("UnityEditor.", System.StringComparison.Ordinal)))
             {
                 return AssemblySource.Unity;
             }

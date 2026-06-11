@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Xml.Linq;
@@ -18,8 +19,9 @@ namespace DTech.LinkGuard.Editor
         public int TypeCount => Namespaces.Sum(ns => ns.Types.Count);
         public int SelectedTypeCount => Types.Count(t => t.IsSelected);
         public bool IsAssemblySelected { get; set; }
+        public bool IsDisabledByDefine { get; set; }
+        public IReadOnlyList<string> RequiredDefines { get; set; } = Array.Empty<string>();
         public bool ProducesEntry => IsAssemblySelected || HasLinkXmlContent || IsAnySelected;
-
         private bool HasLinkXmlContent => LinkXmlAttributes.Count > 0 || LinkXmlChildren.Count > 0;
         private bool IsAnySelected => Namespaces.Any(ns => ns.ProducesEntry);
 

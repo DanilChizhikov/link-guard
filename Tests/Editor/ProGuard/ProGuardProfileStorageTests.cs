@@ -5,7 +5,7 @@ using NUnit.Framework;
 namespace DTech.LinkGuard.Editor.ProGuard.Tests
 {
     [TestFixture]
-    public sealed class ProGuardProfileStorageTests
+    internal sealed class ProGuardProfileStorageTests
     {
         [Test]
         public void ApplyProfile_UsesStableKey_WhenArtifactNamesAreDuplicated()

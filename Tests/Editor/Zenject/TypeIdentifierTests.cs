@@ -6,7 +6,7 @@ using NUnit.Framework;
 namespace DTech.LinkGuard.Editor.Zenject.Tests
 {
     [TestFixture]
-    public sealed class TypeIdentifierTests
+    internal sealed class TypeIdentifierTests
     {
         [Test]
         public void From_StringPair_NullOrEmpty_ReturnsNull()
