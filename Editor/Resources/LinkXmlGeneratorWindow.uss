@@ -225,6 +225,10 @@
     -unity-font-style: bold;
 }
 
+.lxg-row-disabled {
+    color: rgba(255, 255, 255, 0.45);
+}
+
 .lxg-row-pill {
     margin-left: 6px;
     padding-left: 6px;
