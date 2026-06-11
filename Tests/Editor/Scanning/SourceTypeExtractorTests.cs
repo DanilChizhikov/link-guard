@@ -72,11 +72,43 @@ namespace DTech.LinkGuard.Editor.Tests
         }
 
         [Test]
-        public void ExtractFromSource_NestedTypes_AreSkipped()
+        public void ExtractFromSource_GenericClass_UsesLinkerArity()
+        {
+            const string source = "namespace N { public class Foo<T> { } }";
+
+            Assert.That(LinkerNames(source), Is.EqualTo(new[] { "N.Foo`1" }));
+        }
+
+        [Test]
+        public void ExtractFromSource_GenericClassWithMultipleParameters_UsesLinkerArity()
+        {
+            const string source = "namespace N { public class Foo<TKey, TValue> { } }";
+
+            Assert.That(LinkerNames(source), Is.EqualTo(new[] { "N.Foo`2" }));
+        }
+
+        [Test]
+        public void ExtractFromSource_NestedTypes_UseLinkerSeparator()
         {
             const string source = "namespace N { public class Outer { private class Inner { } } }";
 
-            Assert.That(LinkerNames(source), Is.EqualTo(new[] { "N.Outer" }));
+            Assert.That(LinkerNames(source), Is.EqualTo(new[] { "N.Outer", "N.Outer/Inner" }));
+        }
+
+        [Test]
+        public void ExtractFromSource_NestedGenericTypes_UseLinkerSeparatorAndArity()
+        {
+            const string source = "namespace N { public class Outer<T> { private class Inner<TKey, TValue> { } } }";
+
+            Assert.That(LinkerNames(source), Is.EqualTo(new[] { "N.Outer`1", "N.Outer`1/Inner`2" }));
+        }
+
+        [Test]
+        public void ExtractFromSource_RecordWithoutBody_DoesNotCaptureNextTypeAsNested()
+        {
+            const string source = "namespace N { public record A(int Value); public class B { } }";
+
+            Assert.That(LinkerNames(source), Is.EqualTo(new[] { "N.A", "N.B" }));
         }
 
         [Test]

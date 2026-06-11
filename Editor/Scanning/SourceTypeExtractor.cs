@@ -15,7 +15,7 @@ namespace DTech.LinkGuard.Editor
             @"|(?<open>\{)" +
             @"|(?<close>\})",
             RegexOptions.Compiled);
-        
+
         public static List<TypeEntry> CollectFromFiles(IEnumerable<string> filePaths)
         {
             Dictionary<string, TypeEntry> byLinkerName = new Dictionary<string, TypeEntry>(StringComparer.Ordinal);
@@ -46,7 +46,7 @@ namespace DTech.LinkGuard.Editor
 
             return new List<TypeEntry>(byLinkerName.Values);
         }
-        
+
         public static List<TypeEntry> ExtractFromSource(string source)
         {
             List<TypeEntry> types = new List<TypeEntry>();
@@ -61,6 +61,8 @@ namespace DTech.LinkGuard.Editor
             int depth = 0;
             string fileScoped = null;
             Stack<NamespaceScope> nsStack = new Stack<NamespaceScope>();
+            Stack<TypeScope> typeStack = new Stack<TypeScope>();
+            TypeScope? pendingType = null;
 
             foreach (Match match in _token.Matches(cleaned))
             {
@@ -75,18 +77,32 @@ namespace DTech.LinkGuard.Editor
                 }
                 else if (match.Groups["type"].Success)
                 {
-                    int namespaceDepth = nsStack.Count > 0 ? nsStack.Peek().Depth : 0;
-                    if (depth == namespaceDepth)
-                    {
-                        types.Add(BuildType(ComposeNamespace(fileScoped, nsStack), match.Groups["type"].Value));
-                    }
+                    TypeName typeName = BuildTypeName(cleaned, match);
+                    types.Add(BuildType(ComposeNamespace(fileScoped, nsStack), typeStack, typeName));
+
+                    int openIndex = FindDeclarationOpen(cleaned, match.Index + match.Length);
+                    pendingType = openIndex >= 0
+                        ? new TypeScope(typeName, 0, openIndex)
+                        : null;
                 }
                 else if (match.Groups["open"].Success)
                 {
                     depth++;
+
+                    if (pendingType.HasValue && pendingType.Value.OpenIndex == match.Index)
+                    {
+                        TypeScope scope = pendingType.Value.WithDepth(depth);
+                        typeStack.Push(scope);
+                        pendingType = null;
+                    }
                 }
                 else if (match.Groups["close"].Success)
                 {
+                    if (typeStack.Count > 0 && typeStack.Peek().Depth == depth)
+                    {
+                        typeStack.Pop();
+                    }
+
                     if (nsStack.Count > 0 && nsStack.Peek().Depth == depth)
                     {
                         nsStack.Pop();
@@ -102,13 +118,21 @@ namespace DTech.LinkGuard.Editor
             return types;
         }
 
-        private static TypeEntry BuildType(string namespaceName, string typeName)
+        private static TypeEntry BuildType(string namespaceName, Stack<TypeScope> typeStack, TypeName typeName)
         {
+            string typeFullname = ComposeTypeName(typeStack, typeName, "+");
+            string linkerTypeFullname = ComposeTypeName(typeStack, typeName, "/");
             string fullname = string.IsNullOrEmpty(namespaceName)
-                ? typeName
-                : namespaceName + "." + typeName;
+                ? typeFullname
+                : namespaceName + "." + typeFullname;
+            string linkerFullname = string.IsNullOrEmpty(namespaceName)
+                ? linkerTypeFullname
+                : namespaceName + "." + linkerTypeFullname;
+            string displayName = string.IsNullOrEmpty(namespaceName)
+                ? linkerFullname
+                : linkerFullname.Substring(namespaceName.Length + 1);
 
-            return new TypeEntry(namespaceName ?? string.Empty, fullname, fullname, typeName);
+            return new TypeEntry(namespaceName ?? string.Empty, fullname, linkerFullname, displayName);
         }
 
         private static string ComposeNamespace(string fileScoped, Stack<NamespaceScope> nsStack)
@@ -131,6 +155,138 @@ namespace DTech.LinkGuard.Editor
             return string.IsNullOrEmpty(fileScoped)
                 ? blockNamespace
                 : fileScoped + "." + blockNamespace;
+        }
+
+        private static string ComposeTypeName(Stack<TypeScope> typeStack, TypeName typeName, string separator)
+        {
+            if (typeStack.Count == 0)
+            {
+                return typeName.LinkerName;
+            }
+
+            string[] segments = new string[typeStack.Count + 1];
+            int index = typeStack.Count - 1;
+
+            foreach (TypeScope scope in typeStack)
+            {
+                segments[index--] = scope.Name.LinkerName;
+            }
+
+            segments[segments.Length - 1] = typeName.LinkerName;
+
+            return string.Join(separator, segments);
+        }
+
+        private static TypeName BuildTypeName(string source, Match match)
+        {
+            string name = match.Groups["type"].Value;
+            int arity = GetGenericArity(source, match.Index + match.Length);
+            string linkerName = arity > 0 ? $"{name}`{arity}" : name;
+
+            return new TypeName(linkerName);
+        }
+
+        private static int GetGenericArity(string source, int start)
+        {
+            int i = SkipWhitespace(source, start);
+
+            if (i >= source.Length || source[i] != '<')
+            {
+                return 0;
+            }
+
+            int arity = 1;
+            int depth = 0;
+
+            while (i < source.Length)
+            {
+                char c = source[i];
+
+                if (c == '<')
+                {
+                    depth++;
+                }
+                else if (c == '>')
+                {
+                    depth--;
+
+                    if (depth == 0)
+                    {
+                        return arity;
+                    }
+                }
+                else if (c == ',' && depth == 1)
+                {
+                    arity++;
+                }
+
+                i++;
+            }
+
+            return 0;
+        }
+
+        private static int FindDeclarationOpen(string source, int start)
+        {
+            int angleDepth = 0;
+            int parenDepth = 0;
+            int bracketDepth = 0;
+
+            for (int i = start; i < source.Length; i++)
+            {
+                char c = source[i];
+
+                if (c == '<')
+                {
+                    angleDepth++;
+                }
+                else if (c == '>' && angleDepth > 0)
+                {
+                    angleDepth--;
+                }
+                else if (c == '(')
+                {
+                    parenDepth++;
+                }
+                else if (c == ')' && parenDepth > 0)
+                {
+                    parenDepth--;
+                }
+                else if (c == '[')
+                {
+                    bracketDepth++;
+                }
+                else if (c == ']' && bracketDepth > 0)
+                {
+                    bracketDepth--;
+                }
+                else if (angleDepth == 0 && parenDepth == 0 && bracketDepth == 0)
+                {
+                    if (c == '{')
+                    {
+                        return i;
+                    }
+
+                    if (c == ';')
+                    {
+                        return -1;
+                    }
+                }
+            }
+
+            return -1;
+        }
+
+        private static int SkipWhitespace(string source, int start)
+        {
+            int i = start;
+
+            while (i < source.Length && char.IsWhiteSpace(source[i]))
+            {
+                i++;
+            }
+
+            return i;
         }
 
         private static string StripCommentsAndLiterals(string source)
@@ -165,7 +321,6 @@ namespace DTech.LinkGuard.Editor
 
                     i += 2;
                     builder.Append(' ');
-
                     continue;
                 }
 
@@ -183,7 +338,6 @@ namespace DTech.LinkGuard.Editor
                             }
 
                             i++;
-
                             break;
                         }
 
@@ -191,7 +345,6 @@ namespace DTech.LinkGuard.Editor
                     }
 
                     builder.Append("\"\"");
-
                     continue;
                 }
 
@@ -210,7 +363,6 @@ namespace DTech.LinkGuard.Editor
 
                     i++;
                     builder.Append("\"\"");
-
                     continue;
                 }
 
@@ -229,7 +381,6 @@ namespace DTech.LinkGuard.Editor
 
                     i++;
                     builder.Append("' '");
-
                     continue;
                 }
 
@@ -242,14 +393,43 @@ namespace DTech.LinkGuard.Editor
 
         private readonly struct NamespaceScope
         {
+            public string Name { get; }
+            public int Depth { get; }
+
             public NamespaceScope(string name, int depth)
             {
                 Name = name;
                 Depth = depth;
             }
+        }
 
-            public string Name { get; }
+        private readonly struct TypeName
+        {
+            public string LinkerName { get; }
+
+            public TypeName(string linkerName)
+            {
+                LinkerName = linkerName;
+            }
+        }
+
+        private readonly struct TypeScope
+        {
+            public TypeName Name { get; }
             public int Depth { get; }
+            public int OpenIndex { get; }
+
+            public TypeScope(TypeName name, int depth, int openIndex)
+            {
+                Name = name;
+                Depth = depth;
+                OpenIndex = openIndex;
+            }
+
+            public TypeScope WithDepth(int depth)
+            {
+                return new TypeScope(Name, depth, OpenIndex);
+            }
         }
     }
 }

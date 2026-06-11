@@ -65,6 +65,66 @@ namespace DTech.LinkGuard.Editor.Tests
         }
 
         [Test]
+        public void GetUnsatisfied_OrConstraintSatisfiedByFirstSymbol_ReturnsEmpty()
+        {
+            List<string> result = DefineConstraintEvaluator.GetUnsatisfied(
+                new[] { "A || B" },
+                Defines("A"));
+
+            Assert.That(result, Is.Empty);
+        }
+
+        [Test]
+        public void GetUnsatisfied_OrConstraintSatisfiedBySecondSymbol_ReturnsEmpty()
+        {
+            List<string> result = DefineConstraintEvaluator.GetUnsatisfied(
+                new[] { "A || B" },
+                Defines("B"));
+
+            Assert.That(result, Is.Empty);
+        }
+
+        [Test]
+        public void GetUnsatisfied_OrConstraintUnsatisfied_ReturnsOriginalConstraint()
+        {
+            List<string> result = DefineConstraintEvaluator.GetUnsatisfied(
+                new[] { "A || B" },
+                Defines("C"));
+
+            Assert.That(result, Is.EqualTo(new[] { "A || B" }));
+        }
+
+        [Test]
+        public void GetUnsatisfied_NegatedOrConstraintSatisfiedByMissingFirstSymbol_ReturnsEmpty()
+        {
+            List<string> result = DefineConstraintEvaluator.GetUnsatisfied(
+                new[] { "!A || B" },
+                Defines("C"));
+
+            Assert.That(result, Is.Empty);
+        }
+
+        [Test]
+        public void GetUnsatisfied_NegatedOrConstraintSatisfiedBySecondSymbol_ReturnsEmpty()
+        {
+            List<string> result = DefineConstraintEvaluator.GetUnsatisfied(
+                new[] { "!A || B" },
+                Defines("A", "B"));
+
+            Assert.That(result, Is.Empty);
+        }
+
+        [Test]
+        public void GetUnsatisfied_NegatedOrConstraintUnsatisfied_ReturnsOriginalConstraint()
+        {
+            List<string> result = DefineConstraintEvaluator.GetUnsatisfied(
+                new[] { "!A || B" },
+                Defines("A"));
+
+            Assert.That(result, Is.EqualTo(new[] { "!A || B" }));
+        }
+
+        [Test]
         public void GetUnsatisfied_IgnoresBlankEntries()
         {
             List<string> result = DefineConstraintEvaluator.GetUnsatisfied(

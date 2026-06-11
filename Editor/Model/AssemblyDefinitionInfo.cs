@@ -11,6 +11,7 @@ namespace DTech.LinkGuard.Editor
         public string[] includePlatforms;
         public string[] excludePlatforms;
         public string[] defineConstraints;
+        public AssemblyVersionDefine[] versionDefines;
 
         public bool IsEditorOnly =>
             includePlatforms != null
@@ -40,20 +41,36 @@ namespace DTech.LinkGuard.Editor
 
         public static AssemblyDefinitionInfo Parse(string json)
         {
+            return TryParse(json, out AssemblyDefinitionInfo info, out _) ? info : null;
+        }
+
+        public static bool TryParse(string json, out AssemblyDefinitionInfo info, out string reason)
+        {
             if (string.IsNullOrEmpty(json))
             {
-                return null;
+                info = null;
+                reason = "JSON is empty.";
+                return false;
             }
 
             try
             {
-                AssemblyDefinitionInfo info = JsonUtility.FromJson<AssemblyDefinitionInfo>(json);
+                info = JsonUtility.FromJson<AssemblyDefinitionInfo>(json);
 
-                return string.IsNullOrEmpty(info?.name) ? null : info;
+                if (string.IsNullOrEmpty(info?.name))
+                {
+                    reason = "Assembly definition name is missing.";
+                    return false;
+                }
+
+                reason = string.Empty;
+                return true;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                return null;
+                info = null;
+                reason = ex.Message;
+                return false;
             }
         }
     }

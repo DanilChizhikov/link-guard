@@ -10,6 +10,11 @@ namespace DTech.LinkGuard.Editor
             ';',
             ','
         };
+
+        private static readonly string[] _orSeparator = new[]
+        {
+            "||"
+        };
         
         public static List<string> GetUnsatisfied(
             IReadOnlyList<string> constraints,
@@ -29,21 +34,9 @@ namespace DTech.LinkGuard.Editor
                     continue;
                 }
 
-                string constraint = raw.Trim();
-                bool negated = constraint[0] == '!';
-                string symbol = negated ? constraint.Substring(1).Trim() : constraint;
-
-                if (symbol.Length == 0)
+                if (!IsConstraintSatisfied(raw.Trim(), defines))
                 {
-                    continue;
-                }
-
-                bool defined = defines != null && defines.Contains(symbol);
-                bool satisfied = defined != negated;
-
-                if (!satisfied)
-                {
-                    unsatisfied.Add(constraint);
+                    unsatisfied.Add(raw.Trim());
                 }
             }
 
@@ -53,6 +46,38 @@ namespace DTech.LinkGuard.Editor
         public static bool IsSatisfied(IReadOnlyList<string> constraints, ISet<string> defines)
         {
             return GetUnsatisfied(constraints, defines).Count == 0;
+        }
+
+        private static bool IsConstraintSatisfied(string constraint, ISet<string> defines)
+        {
+            string[] parts = constraint.Split(_orSeparator, StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (string part in parts)
+            {
+                string clause = part.Trim();
+
+                if (clause.Length == 0)
+                {
+                    continue;
+                }
+
+                bool negated = clause[0] == '!';
+                string symbol = negated ? clause.Substring(1).Trim() : clause;
+
+                if (symbol.Length == 0)
+                {
+                    continue;
+                }
+
+                bool defined = defines != null && defines.Contains(symbol);
+
+                if (defined != negated)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
         
         public static HashSet<string> ParseDefines(string scriptingDefineSymbols)
