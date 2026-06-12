@@ -154,6 +154,43 @@ internal sealed class MyCustomMergeProvider : ILinkXmlMergeProvider
 The returned XML is merged into the window's tree like any other `link.xml` import; press `Generate link.xml`
 afterwards to write the result.
 
+#### Build-time API (all merge providers)
+For automated pipelines, run every discovered merge provider at once and write the combined result to
+`Assets/link.xml` from a custom build hook:
+
+```csharp
+using DTech.LinkGuard.Editor;
+using UnityEditor.Build;
+using UnityEditor.Build.Reporting;
+
+internal sealed class LinkXmlBuildHook : IPreprocessBuildWithReport
+{
+    public int callbackOrder => 0;
+
+    public void OnPreprocessBuild(BuildReport report)
+    {
+        LinkXmlPatchReport patchReport = LinkXmlPatcher.Patch(throwOnError: true);
+        UnityEngine.Debug.Log(patchReport);
+    }
+}
+```
+
+`LinkXmlPatcher.Patch(throwOnError)` discovers all `ILinkXmlMergeProvider` implementations (the built-in file
+merge, the Zenject provider when enabled, and any custom providers), merges their output into a single document,
+and writes it to `Assets/link.xml` without dialogs. It does not register itself as a build callback — opt in from
+your own build script.
+
+Behavior details:
+- With `throwOnError: false` (default), a failed provider is logged and skipped while the remaining providers are
+  merged and written; inspect `LinkXmlPatchReport.Success` and `Providers` for per-provider outcomes.
+- With `throwOnError: true`, any provider failure throws `BuildFailedException` before anything is written, which
+  aborts the build when called from a build callback.
+- When no provider produces content, `Assets/link.xml` is left untouched (`Written` is `false`).
+- The call is idempotent: the file provider re-includes the existing `Assets/link.xml`, so prior content is
+  preserved and duplicates are collapsed on every run.
+- Call it from `IPreprocessBuildWithReport` (or before `BuildPipeline.BuildPlayer`): managed stripping collects
+  `link.xml` files later in the same build, while post-build callbacks are too late.
+
 ### Zenject Module
 When either `com.svermeulen.extenject` or `com.modesttree.zenject` is present in the project manifest, the
 optional Zenject extension is compiled in and adds a **Merge from Zenject Installers** button to the toolbar.

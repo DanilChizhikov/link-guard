@@ -8,10 +8,12 @@
 - The **Generate ProGuard** button is shown only when the active build target is Android; a notice is displayed when minification (R8) is disabled
 - Public build-time API `DTech.LinkGuard.Editor.ProGuard.ProGuardPatcher.Patch(path)` for invocation from `IPreprocessBuildWithReport`; it keeps all scanned Android classes and skips when minification is disabled
 - ProGuard selection profiles (save/load JSON), mirroring the link.xml profiles
+- Public build-time API `DTech.LinkGuard.Editor.LinkXmlPatcher.Patch(throwOnError)` that runs every discovered `ILinkXmlMergeProvider`, merges their output, and writes `Assets/link.xml` without dialogs; returns `LinkXmlPatchReport` with per-provider outcomes, and with `throwOnError: true` a provider failure throws `BuildFailedException` before anything is written
 
 ### Changed
 - The editor window is now a modular tab host (`Window/DTech/Link Guard`); `link.xml` and `ProGuard` are tabs discovered through `IGeneratorTab` / `TypeCache`. The legacy `Window/DTech/Link XML Generator` menu opens the same window
 - ProGuard lives in a separate optional assembly (`com.dtech.linkguard.editor.proguard`); the core window has no Android or ProGuard dependencies
+- Merge provider discovery silently skips `ILinkXmlMergeProvider` implementations without a parameterless constructor instead of logging an instantiation warning
 
 ## [1.1.0] - 2026-05-13
 
