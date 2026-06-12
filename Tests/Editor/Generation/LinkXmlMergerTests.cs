@@ -264,6 +264,71 @@ namespace DTech.LinkGuard.Editor.Tests
             Assert.That(attrOrder, Is.EqualTo(new[] { "fullname", "preserve", "ignoreIfMissing", "alpha", "zeta" }));
         }
 
+        [Test]
+        public void MergeContents_EmptyInputList_ReturnsEmptyLinker()
+        {
+            LinkXmlMergeResult result = LinkXmlMerger.Merge(Array.Empty<LinkXmlMergeInput>());
+
+            Assert.That(result.FilesFound, Is.EqualTo(0));
+            Assert.That(result.FilesMerged, Is.EqualTo(0));
+            Assert.That(result.SkippedFiles, Is.Empty);
+
+            XDocument document = XDocument.Parse(result.Xml);
+            Assert.That(document.Root!.Name.LocalName, Is.EqualTo("linker"));
+            Assert.That(document.Root.Elements(), Is.Empty);
+        }
+
+        [Test]
+        public void MergeContents_InvalidXml_RecordsSkippedWithSourceLabel()
+        {
+            LinkXmlMergeInput invalid = new LinkXmlMergeInput("broken", "<linker><assembly fullname=\"oops\"</linker>");
+            LinkXmlMergeInput valid = new LinkXmlMergeInput("ok", "<linker><assembly fullname=\"X\" preserve=\"all\"/></linker>");
+
+            LinkXmlMergeResult result = LinkXmlMerger.Merge(new[] { invalid, valid });
+
+            Assert.That(result.FilesMerged, Is.EqualTo(1));
+            Assert.That(result.SkippedFiles, Has.Count.EqualTo(1));
+            Assert.That(result.SkippedFiles[0].Path, Is.EqualTo("broken"));
+        }
+
+        [Test]
+        public void MergeContents_RootElementNotLinker_RecordsSkipped()
+        {
+            LinkXmlMergeInput wrongRoot = new LinkXmlMergeInput("wrong", "<root><assembly fullname=\"X\"/></root>");
+
+            LinkXmlMergeResult result = LinkXmlMerger.Merge(new[] { wrongRoot });
+
+            Assert.That(result.FilesMerged, Is.EqualTo(0));
+            Assert.That(result.SkippedFiles, Has.Count.EqualTo(1));
+            Assert.That(result.SkippedFiles[0].Path, Is.EqualTo("wrong"));
+            Assert.That(result.SkippedFiles[0].Reason, Does.Contain("<linker>"));
+        }
+
+        [Test]
+        public void MergeContents_TwoInputs_CombinesAssemblies()
+        {
+            LinkXmlMergeInput a = new LinkXmlMergeInput("a", "<linker><assembly fullname=\"A\" preserve=\"all\"/></linker>");
+            LinkXmlMergeInput b = new LinkXmlMergeInput("b", "<linker><assembly fullname=\"B\" preserve=\"all\"/></linker>");
+
+            LinkXmlMergeResult result = LinkXmlMerger.Merge(new[] { a, b });
+            List<string> names = ParseAssemblies(result.Xml).Select(asm => asm.Attribute("fullname")!.Value).ToList();
+
+            Assert.That(result.FilesMerged, Is.EqualTo(2));
+            Assert.That(names, Is.EqualTo(new[] { "A", "B" }));
+        }
+
+        [Test]
+        public void MergeContents_DuplicateAssembly_Collapses()
+        {
+            LinkXmlMergeInput a = new LinkXmlMergeInput("a", "<linker><assembly fullname=\"X\" preserve=\"all\"/></linker>");
+            LinkXmlMergeInput b = new LinkXmlMergeInput("b", "<linker><assembly fullname=\"X\" preserve=\"all\"/></linker>");
+
+            LinkXmlMergeResult result = LinkXmlMerger.Merge(new[] { a, b });
+
+            Assert.That(ParseAssemblies(result.Xml), Has.Count.EqualTo(1));
+            Assert.That(result.DuplicatesCollapsed, Is.EqualTo(1));
+        }
+
         private string Write(string content)
         {
             string path = Path.Combine(_tempDirectory, Guid.NewGuid().ToString("N") + ".xml");
