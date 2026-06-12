@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -39,16 +40,59 @@ namespace DTech.LinkGuard.Editor
 
             File.WriteAllText(normalized, xml);
 
-            if (normalized.StartsWith("Assets/"))
+            string assetPath = ToAssetPath(normalized);
+
+            if (!string.IsNullOrEmpty(assetPath))
             {
-                AssetDatabase.ImportAsset(normalized, ImportAssetOptions.ForceUpdate);
-            }
-            else
-            {
-                AssetDatabase.Refresh();
+                AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
             }
 
             Debug.Log($"[LinkXmlGenerator] link.xml written to {normalized}");
+        }
+
+        private static string ToAssetPath(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                return string.Empty;
+            }
+
+            string normalized = path.Replace('\\', '/');
+
+            if (normalized.StartsWith("Assets/", StringComparison.Ordinal)
+                || normalized.StartsWith("Packages/", StringComparison.Ordinal))
+            {
+                return normalized;
+            }
+
+            if (!Path.IsPathRooted(path))
+            {
+                return string.Empty;
+            }
+
+            string fullPath = Path.GetFullPath(path).Replace('\\', '/');
+            DirectoryInfo projectDirectory = Directory.GetParent(Application.dataPath);
+
+            if (projectDirectory == null)
+            {
+                return string.Empty;
+            }
+
+            string projectPath = projectDirectory.FullName.Replace('\\', '/');
+            string assetsPath = projectPath + "/Assets/";
+            string packagesPath = projectPath + "/Packages/";
+
+            if (fullPath.StartsWith(assetsPath, StringComparison.Ordinal))
+            {
+                return "Assets/" + fullPath.Substring(assetsPath.Length);
+            }
+
+            if (fullPath.StartsWith(packagesPath, StringComparison.Ordinal))
+            {
+                return "Packages/" + fullPath.Substring(packagesPath.Length);
+            }
+
+            return string.Empty;
         }
     }
 }
