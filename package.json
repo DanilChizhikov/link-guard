@@ -1,10 +1,10 @@
 {
     "name": "com.dtech.link-guard",
     "displayName": "Link Guard",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "unity": "6000.0",
     "description": "Unity editor tool for scanning assemblies and generating or merging link.xml preservation files.",
-    "changelogUrl": "https://github.com/DanilChizhikov/link-guard/releases/tag/v1.1.0",
+    "changelogUrl": "https://github.com/DanilChizhikov/link-guard/releases/tag/v1.2.0",
     "documentationUrl": "https://github.com/DanilChizhikov/link-guard/",
     "keywords": [
         "link.xml",
