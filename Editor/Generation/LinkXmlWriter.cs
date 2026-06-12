@@ -23,6 +23,13 @@ namespace DTech.LinkGuard.Editor
                 return false;
             }
 
+            Write(xml, normalized);
+            return true;
+        }
+
+        public static void Write(string xml, string targetPath = DefaultPath)
+        {
+            string normalized = string.IsNullOrEmpty(targetPath) ? DefaultPath : targetPath;
             string directory = Path.GetDirectoryName(normalized);
 
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
@@ -42,7 +49,6 @@ namespace DTech.LinkGuard.Editor
             }
 
             Debug.Log($"[LinkXmlGenerator] link.xml written to {normalized}");
-            return true;
         }
     }
 }

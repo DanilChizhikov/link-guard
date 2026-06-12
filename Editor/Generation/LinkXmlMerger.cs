@@ -54,6 +54,34 @@ namespace DTech.LinkGuard.Editor
             return new LinkXmlMergeResult(xml, paths.Count, filesMerged, duplicatesCollapsed, skippedFiles);
         }
 
+        public static LinkXmlMergeResult Merge(IReadOnlyList<LinkXmlMergeInput> inputs)
+        {
+            int sourcesMerged = 0;
+            int duplicatesCollapsed = 0;
+            List<LinkXmlMergeSkippedFile> skippedFiles = new List<LinkXmlMergeSkippedFile>();
+            XElement linker = new XElement(LinkerElement);
+
+            foreach (LinkXmlMergeInput input in inputs)
+            {
+                if (!TryParseLinker(input.Xml, input.Source, skippedFiles, out XElement sourceLinker))
+                {
+                    continue;
+                }
+
+                sourcesMerged++;
+
+                foreach (XElement child in sourceLinker.Elements())
+                {
+                    MergeChild(linker, child, ref duplicatesCollapsed);
+                }
+            }
+
+            XDocument document = new XDocument(linker);
+            string xml = LinkXmlBuilder.Serialize(document);
+
+            return new LinkXmlMergeResult(xml, inputs.Count, sourcesMerged, duplicatesCollapsed, skippedFiles);
+        }
+
         private static bool TryLoadLinker(
             string path,
             List<LinkXmlMergeSkippedFile> skippedFiles,
@@ -69,10 +97,29 @@ namespace DTech.LinkGuard.Editor
 
             try
             {
-                XDocument document = XDocument.Load(path, LoadOptions.PreserveWhitespace);
+                return TryParseLinker(File.ReadAllText(path), path, skippedFiles, out linker);
+            }
+            catch (Exception ex)
+            {
+                skippedFiles.Add(new LinkXmlMergeSkippedFile(path, ex.Message));
+                return false;
+            }
+        }
+
+        private static bool TryParseLinker(
+            string xml,
+            string sourceLabel,
+            List<LinkXmlMergeSkippedFile> skippedFiles,
+            out XElement linker)
+        {
+            linker = null;
+
+            try
+            {
+                XDocument document = XDocument.Parse(xml, LoadOptions.PreserveWhitespace);
                 if (document.Root == null || document.Root.Name.LocalName != LinkerElement)
                 {
-                    skippedFiles.Add(new LinkXmlMergeSkippedFile(path, "Root element is not <linker>."));
+                    skippedFiles.Add(new LinkXmlMergeSkippedFile(sourceLabel, "Root element is not <linker>."));
                     return false;
                 }
 
@@ -81,7 +128,7 @@ namespace DTech.LinkGuard.Editor
             }
             catch (Exception ex)
             {
-                skippedFiles.Add(new LinkXmlMergeSkippedFile(path, ex.Message));
+                skippedFiles.Add(new LinkXmlMergeSkippedFile(sourceLabel, ex.Message));
                 return false;
             }
         }
