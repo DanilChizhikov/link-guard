@@ -38,6 +38,11 @@ namespace DTech.LinkGuard.Editor
 
             EnsureInitialized();
 
+            if (IsUnityEditorName(assemblyName) || _precompiledEditorNames.Contains(assemblyName))
+            {
+                return BuildPresence.Missing;
+            }
+
             if (_playerNames.Contains(assemblyName))
             {
                 return BuildPresence.Present;
@@ -51,11 +56,6 @@ namespace DTech.LinkGuard.Editor
             if (IsBclName(assemblyName) || IsUnityEngineName(assemblyName))
             {
                 return BuildPresence.Present;
-            }
-
-            if (IsUnityEditorName(assemblyName) || _precompiledEditorNames.Contains(assemblyName))
-            {
-                return BuildPresence.Missing;
             }
 
             if (_editorNames.Contains(assemblyName))
@@ -218,7 +218,7 @@ namespace DTech.LinkGuard.Editor
             var editorNames = new Dictionary<string, string>(StringComparer.Ordinal);
             BuildPrecompiledMap(editorNames, CompilationPipeline.PrecompiledAssemblySources.UnityEditor);
             _precompiledEditorNames.Clear();
-            _precompiledEditorNames.UnionWith(editorNames.Values);
+            _precompiledEditorNames.UnionWith(editorNames.Keys);
             Dictionary<string, Assembly> loadedByName = AppDomain.CurrentDomain
                 .GetAssemblies()
                 .GroupBy(a => a.GetName().Name)
