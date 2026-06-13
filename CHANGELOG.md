@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- link.xml validation: a **Validate** toolbar button in the generator window checks the current `Assets/link.xml` and removes `<assembly>`/`<type>` entries that will not be in the player build. The window shows a report of the stale entries and removes them only after confirmation
+- Public build-time API `DTech.LinkGuard.Editor.LinkXmlValidator.Validate(apply, throwOnError)` for invocation from external build scripts; returns `LinkXmlValidationReport` with removed/kept entries, and with `throwOnError: true` a parse failure throws `BuildFailedException`
+- Conservative removal policy: entries are removed only when the assembly/type is confidently absent. Editor-only and `UnityEditor.*` assemblies are removed; BCL, `UnityEngine.*`, precompiled, and unresolvable entries are kept. `ignoreIfMissing="true"` assemblies and wildcard type patterns are always kept
+
 ## [1.2.0] - 2026-06-09
 
 ### Added

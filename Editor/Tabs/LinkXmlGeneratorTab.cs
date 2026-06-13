@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
@@ -78,6 +79,7 @@ namespace DTech.LinkGuard.Editor
             ToolbarButton noneBtn = root.Q<ToolbarButton>("btn-none");
             ToolbarButton loadBtn = root.Q<ToolbarButton>("btn-load");
             ToolbarButton saveBtn = root.Q<ToolbarButton>("btn-save");
+            ToolbarButton validateBtn = root.Q<ToolbarButton>("btn-validate");
             _mergeButtonsHost = root.Q<VisualElement>("merge-buttons");
             _previewToggle = root.Q<ToolbarToggle>("tgl-preview");
             _generateButton = root.Q<ToolbarButton>("btn-generate");
@@ -104,6 +106,7 @@ namespace DTech.LinkGuard.Editor
             noneBtn.clicked += NoneClickedHandler;
             loadBtn.clicked += LoadProfileClickedHandler;
             saveBtn.clicked += SaveProfileClickedHandler;
+            validateBtn.clicked += ValidateClickedHandler;
             _generateButton.clicked += Generate;
 
             BuildMergeButtons();
@@ -197,6 +200,124 @@ namespace DTech.LinkGuard.Editor
 
             LinkXmlWriter.WriteWithConfirmation(xml);
             UpdateFooter();
+        }
+
+        private void ValidateClickedHandler()
+        {
+            if (!File.Exists(LinkXmlWriter.DefaultPath))
+            {
+                EditorUtility.DisplayDialog(Title, $"No link.xml found at {LinkXmlWriter.DefaultPath}.", "OK");
+                return;
+            }
+
+            LinkXmlValidationReport report;
+
+            try
+            {
+                EditorUtility.DisplayProgressBar(Title, "Validating link.xml...", 0.5f);
+                report = LinkXmlValidator.Validate(apply: false);
+            }
+            finally
+            {
+                EditorUtility.ClearProgressBar();
+            }
+
+            if (!report.Success)
+            {
+                EditorUtility.DisplayDialog(
+                    Title, $"link.xml could not be validated: {report.FailureReason}", "OK");
+                return;
+            }
+
+            if (!report.Changed)
+            {
+                string message = "link.xml is valid. No stale entries found.";
+
+                if (report.KeptUnknown.Count > 0)
+                {
+                    message += $"\n\n{report.KeptUnknown.Count} entries could not be verified and were kept "
+                        + "(see Console).";
+                }
+
+                EditorUtility.DisplayDialog(Title, message, "OK");
+                return;
+            }
+
+            if (!EditorUtility.DisplayDialog(Title, BuildValidationSummary(report), "Remove", "Cancel"))
+            {
+                return;
+            }
+
+            LinkXmlValidator.Apply(report);
+            Refresh();
+        }
+
+        private static string BuildValidationSummary(LinkXmlValidationReport report)
+        {
+            const int maxLines = 12;
+
+            StringBuilder builder = new StringBuilder();
+            builder.AppendLine($"Validation found stale entries in {report.OutputPath}:");
+
+            int budget = maxLines;
+            int omitted = 0;
+
+            if (report.RemovedAssemblies.Count > 0)
+            {
+                builder.AppendLine();
+                builder.AppendLine($"Assemblies to remove ({report.RemovedAssemblies.Count}):");
+
+                foreach (string assembly in report.RemovedAssemblies)
+                {
+                    if (budget <= 0)
+                    {
+                        omitted++;
+                        continue;
+                    }
+
+                    builder.AppendLine($"  - {assembly}");
+                    budget--;
+                }
+            }
+
+            if (report.RemovedTypeCount > 0)
+            {
+                builder.AppendLine();
+                builder.AppendLine($"Types to remove ({report.RemovedTypeCount}):");
+
+                foreach (LinkXmlValidationTypeGroup group in report.RemovedTypes)
+                {
+                    foreach (string type in group.TypeNames)
+                    {
+                        if (budget <= 0)
+                        {
+                            omitted++;
+                            continue;
+                        }
+
+                        builder.AppendLine($"  - {group.AssemblyName}: {type}");
+                        budget--;
+                    }
+                }
+            }
+
+            if (omitted > 0)
+            {
+                builder.AppendLine($"  ... and {omitted} more (see Console).");
+            }
+
+            if (report.KeptIgnoreIfMissing.Count > 0 || report.KeptUnknown.Count > 0)
+            {
+                builder.AppendLine();
+                builder.AppendLine(
+                    $"Kept: {report.KeptIgnoreIfMissing.Count} ignoreIfMissing, "
+                    + $"{report.KeptUnknown.Count} unverifiable (see Console).");
+            }
+
+            builder.AppendLine();
+            builder.Append("Remove these entries?");
+
+            return builder.ToString();
         }
 
         private void MergeProviderClickedHandler(ILinkXmlMergeProvider provider)
