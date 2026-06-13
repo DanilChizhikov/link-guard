@@ -113,7 +113,7 @@ namespace DTech.LinkGuard.Editor
             {
                 return;
             }
-            
+
             bool hasPreserve = info.Assembly.Attribute(PreserveAttribute) != null;
             bool hasChildElements = info.Assembly.Elements().Any();
 
@@ -137,7 +137,7 @@ namespace DTech.LinkGuard.Editor
                 info.KeptUnknown.Add(entry);
                 return;
             }
-            
+
             if (fullname.IndexOf('*') >= 0)
             {
                 return;
@@ -151,7 +151,7 @@ namespace DTech.LinkGuard.Editor
                     RemoveWithLeadingWhitespace(info.TypeElement);
                     info.RemovedTypeNames.Add(fullname);
                 } break;
-                
+
                 case BuildPresence.Unknown:
                 {
                     var entry = new LinkXmlValidationSkippedEntry(info.AssemblyName, fullname, "Type presence in the build could not be determined.");
@@ -203,7 +203,7 @@ namespace DTech.LinkGuard.Editor
                 || string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(value, "yes", StringComparison.OrdinalIgnoreCase);
         }
-        
+
         private readonly struct AssemblyProcessInfo
         {
             public XElement Assembly { get; }
@@ -229,7 +229,7 @@ namespace DTech.LinkGuard.Editor
                 KeptUnknown = keptUnknown;
             }
         }
-        
+
         private readonly struct ValidateTypeInfo
         {
             public XElement Assembly { get; }
@@ -255,7 +255,7 @@ namespace DTech.LinkGuard.Editor
                 KeptUnknown = keptUnknown;
             }
         }
-        
+
         private readonly struct TypeProcessInfo
         {
             public XElement TypeElement { get; }

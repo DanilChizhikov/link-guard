@@ -17,7 +17,7 @@ namespace DTech.LinkGuard.Editor
             CompilationPipeline.PrecompiledAssemblySources.UserAssembly |
             CompilationPipeline.PrecompiledAssemblySources.UnityEngine |
             CompilationPipeline.PrecompiledAssemblySources.SystemAssembly;
-        
+
         private readonly Dictionary<string, Assembly> _reflectionCache = new(StringComparer.Ordinal);
         private readonly HashSet<string> _playerNames = new(StringComparer.Ordinal);
         private readonly HashSet<string> _editorNames = new(StringComparer.Ordinal);
@@ -26,8 +26,9 @@ namespace DTech.LinkGuard.Editor
         private readonly Dictionary<string, string> _playerOutputPaths = new(StringComparer.Ordinal);
         private readonly Dictionary<string, string> _precompiledPlayerPaths = new(StringComparer.Ordinal);
         private readonly Dictionary<string, Assembly> _loadedByName = new(StringComparer.Ordinal);
-        
+
         private bool _initialized;
+        private bool _projectAsmdefScanIncomplete;
 
         public BuildPresence ResolveAssembly(string assemblyName)
         {
@@ -73,6 +74,11 @@ namespace DTech.LinkGuard.Editor
                 return BuildPresence.Unknown;
             }
 
+            if (_projectAsmdefScanIncomplete)
+            {
+                return BuildPresence.Unknown;
+            }
+
             return BuildPresence.Missing;
         }
 
@@ -108,7 +114,7 @@ namespace DTech.LinkGuard.Editor
                 return BuildPresence.Unknown;
             }
         }
-        
+
         private static void BuildPrecompiledMap(Dictionary<string, string> map, CompilationPipeline.PrecompiledAssemblySources sources)
         {
             map.Clear();
@@ -133,7 +139,7 @@ namespace DTech.LinkGuard.Editor
                 }
             }
         }
-        
+
         private static bool IsBclName(string assemblyName)
         {
             return string.Equals(assemblyName, "mscorlib", StringComparison.Ordinal)
@@ -250,6 +256,8 @@ namespace DTech.LinkGuard.Editor
         private void LoadProjectAsmdefNames()
         {
             _projectAsmdefNames.Clear();
+            _projectAsmdefScanIncomplete = false;
+
             foreach (string guid in AssetDatabase.FindAssets("t:AssemblyDefinitionAsset"))
             {
                 string assetPath = AssetDatabase.GUIDToAssetPath(guid);
@@ -263,14 +271,19 @@ namespace DTech.LinkGuard.Editor
                 {
                     string json = File.ReadAllText(assetPath);
 
-                    if (AssemblyDefinitionInfo.TryParse(json, out AssemblyDefinitionInfo info, out _))
+                    if (AssemblyDefinitionInfo.TryParse(json, out AssemblyDefinitionInfo info, out string reason))
                     {
                         _projectAsmdefNames.Add(info.name);
+                        continue;
                     }
+
+                    _projectAsmdefScanIncomplete = true;
+                    Debug.LogWarning($"[LinkXmlGenerator] Failed to parse asmdef at {assetPath}: {reason}");
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // ignored
+                    _projectAsmdefScanIncomplete = true;
+                    Debug.LogWarning($"[LinkXmlGenerator] Failed to read asmdef at {assetPath}: {ex.Message}");
                 }
             }
         }
