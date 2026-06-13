@@ -1,0 +1,278 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using UnityEditor;
+using UnityEditor.Compilation;
+using UnityEngine;
+using Assembly = System.Reflection.Assembly;
+using CompilationAssembly = UnityEditor.Compilation.Assembly;
+
+namespace DTech.LinkGuard.Editor
+{
+    internal sealed class PlayerBuildMembershipOracle : IBuildMembershipOracle
+    {
+        private static readonly CompilationPipeline.PrecompiledAssemblySources _precompiledSources =
+            CompilationPipeline.PrecompiledAssemblySources.UserAssembly |
+            CompilationPipeline.PrecompiledAssemblySources.UnityEngine |
+            CompilationPipeline.PrecompiledAssemblySources.SystemAssembly;
+        
+        private readonly Dictionary<string, Assembly> _reflectionCache = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _playerNames = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _editorNames = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _precompiledEditorNames = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _projectAsmdefNames = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, string> _playerOutputPaths = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, string> _precompiledPlayerPaths = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, Assembly> _loadedByName = new(StringComparer.Ordinal);
+        
+        private bool _initialized;
+
+        public BuildPresence ResolveAssembly(string assemblyName)
+        {
+            if (string.IsNullOrEmpty(assemblyName))
+            {
+                return BuildPresence.Unknown;
+            }
+
+            EnsureInitialized();
+
+            if (_playerNames.Contains(assemblyName))
+            {
+                return BuildPresence.Present;
+            }
+
+            if (_precompiledPlayerPaths.ContainsKey(assemblyName))
+            {
+                return BuildPresence.Present;
+            }
+
+            if (IsBclName(assemblyName) || IsUnityEngineName(assemblyName))
+            {
+                return BuildPresence.Present;
+            }
+
+            if (IsUnityEditorName(assemblyName) || _precompiledEditorNames.Contains(assemblyName))
+            {
+                return BuildPresence.Missing;
+            }
+
+            if (_editorNames.Contains(assemblyName))
+            {
+                return BuildPresence.Missing;
+            }
+
+            if (_projectAsmdefNames.Contains(assemblyName))
+            {
+                return BuildPresence.Unknown;
+            }
+
+            if (_loadedByName.ContainsKey(assemblyName))
+            {
+                return BuildPresence.Unknown;
+            }
+
+            return BuildPresence.Missing;
+        }
+
+        public BuildPresence ResolveType(string assemblyName, string linkerTypeFullname)
+        {
+            if (string.IsNullOrEmpty(assemblyName) || string.IsNullOrEmpty(linkerTypeFullname))
+            {
+                return BuildPresence.Unknown;
+            }
+
+            if (linkerTypeFullname.IndexOf('<') >= 0)
+            {
+                return BuildPresence.Unknown;
+            }
+
+            EnsureInitialized();
+
+            Assembly handle = ResolveReflectionAssembly(assemblyName);
+            if (handle == null)
+            {
+                return BuildPresence.Unknown;
+            }
+
+            string reflectionName = linkerTypeFullname.Replace('/', '+');
+
+            try
+            {
+                Type type = handle.GetType(reflectionName, throwOnError: false);
+                return type != null ? BuildPresence.Present : BuildPresence.Missing;
+            }
+            catch
+            {
+                return BuildPresence.Unknown;
+            }
+        }
+        
+        private static void BuildPrecompiledMap(Dictionary<string, string> map, CompilationPipeline.PrecompiledAssemblySources sources)
+        {
+            map.Clear();
+            string[] paths = CompilationPipeline.GetPrecompiledAssemblyPaths(sources);
+            if (paths == null)
+            {
+                return;
+            }
+
+            foreach (string path in paths)
+            {
+                if (string.IsNullOrEmpty(path))
+                {
+                    continue;
+                }
+
+                string name = Path.GetFileNameWithoutExtension(path);
+
+                if (!string.IsNullOrEmpty(name))
+                {
+                    map[name] = path;
+                }
+            }
+        }
+        
+        private static bool IsBclName(string assemblyName)
+        {
+            return string.Equals(assemblyName, "mscorlib", StringComparison.Ordinal)
+                || string.Equals(assemblyName, "netstandard", StringComparison.Ordinal)
+                || string.Equals(assemblyName, "System", StringComparison.Ordinal)
+                || assemblyName.StartsWith("System.", StringComparison.Ordinal)
+                || assemblyName.StartsWith("Microsoft.", StringComparison.Ordinal);
+        }
+
+        private static bool IsUnityEngineName(string assemblyName)
+        {
+            return string.Equals(assemblyName, "UnityEngine", StringComparison.Ordinal)
+                || assemblyName.StartsWith("UnityEngine.", StringComparison.Ordinal);
+        }
+
+        private static bool IsUnityEditorName(string assemblyName)
+        {
+            return string.Equals(assemblyName, "UnityEditor", StringComparison.Ordinal)
+                || assemblyName.StartsWith("UnityEditor.", StringComparison.Ordinal);
+        }
+
+        private Assembly ResolveReflectionAssembly(string assemblyName)
+        {
+            if (_reflectionCache.TryGetValue(assemblyName, out Assembly cached))
+            {
+                return cached;
+            }
+
+            Assembly resolved = null;
+            if (_loadedByName.TryGetValue(assemblyName, out Assembly loaded))
+            {
+                resolved = loaded;
+            }
+            else
+            {
+                string path = null;
+
+                if (_playerOutputPaths.TryGetValue(assemblyName, out string outputPath) && File.Exists(outputPath))
+                {
+                    path = outputPath;
+                }
+                else if (_precompiledPlayerPaths.TryGetValue(assemblyName, out string precompiled)
+                    && File.Exists(precompiled))
+                {
+                    path = precompiled;
+                }
+
+                if (!string.IsNullOrEmpty(path))
+                {
+                    try
+                    {
+                        resolved = Assembly.LoadFrom(path);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogWarning($"[LinkXmlGenerator] Failed to load assembly '{assemblyName}' from {path}: {ex.Message}");
+                    }
+                }
+            }
+
+            _reflectionCache[assemblyName] = resolved;
+            return resolved;
+        }
+
+        private void EnsureInitialized()
+        {
+            if (_initialized)
+            {
+                return;
+            }
+
+            CompilationAssembly[] playerAssemblies = CompilationPipeline.GetAssemblies(AssembliesType.PlayerWithoutTestAssemblies);
+            CompilationAssembly[] editorAssemblies = CompilationPipeline.GetAssemblies(AssembliesType.Editor);
+
+            _playerNames.Clear();
+            _playerNames.UnionWith(playerAssemblies.Select(a => a.name));
+            _editorNames.Clear();
+            _editorNames.UnionWith(editorAssemblies.Select(a => a.name));
+
+            BuildPathMap(playerAssemblies);
+            BuildPrecompiledMap(_precompiledPlayerPaths, _precompiledSources);
+            var editorNames = new Dictionary<string, string>(StringComparer.Ordinal);
+            BuildPrecompiledMap(editorNames, CompilationPipeline.PrecompiledAssemblySources.UnityEditor);
+            _precompiledEditorNames.Clear();
+            _precompiledEditorNames.UnionWith(editorNames.Values);
+            Dictionary<string, Assembly> loadedByName = AppDomain.CurrentDomain
+                .GetAssemblies()
+                .GroupBy(a => a.GetName().Name)
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+
+            _loadedByName.Clear();
+            foreach (var item in loadedByName)
+            {
+                _loadedByName[item.Key] = item.Value;
+            }
+
+            LoadProjectAsmdefNames();
+
+            _initialized = true;
+        }
+
+        private void BuildPathMap(IEnumerable<CompilationAssembly> assemblies)
+        {
+            _playerOutputPaths.Clear();
+            foreach (CompilationAssembly assembly in assemblies)
+            {
+                if (!string.IsNullOrEmpty(assembly.name))
+                {
+                    _playerOutputPaths[assembly.name] = assembly.outputPath;
+                }
+            }
+        }
+
+        private void LoadProjectAsmdefNames()
+        {
+            _projectAsmdefNames.Clear();
+            foreach (string guid in AssetDatabase.FindAssets("t:AssemblyDefinitionAsset"))
+            {
+                string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+
+                if (string.IsNullOrEmpty(assetPath))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    string json = File.ReadAllText(assetPath);
+
+                    if (AssemblyDefinitionInfo.TryParse(json, out AssemblyDefinitionInfo info, out _))
+                    {
+                        _projectAsmdefNames.Add(info.name);
+                    }
+                }
+                catch
+                {
+                    // ignored
+                }
+            }
+        }
+    }
+}
