@@ -22,6 +22,7 @@ shrinker — the native-side counterpart of `link.xml`.
     - [Preview](#preview)
     - [Profiles](#profiles)
     - [Merge Existing link.xml Files](#merge-existing-linkxml-files)
+    - [Validate link.xml](#validate-linkxml)
     - [Custom SDK Groups](#custom-sdk-groups)
     - [Custom Merge Providers](#custom-merge-providers)
     - [Zenject Module](#zenject-module)
@@ -59,6 +60,7 @@ For example `https://github.com/DanilChizhikov/link-guard.git#v1.0.0`.
 - Save and load selection profiles
 - Import the current `Assets/link.xml` when the window opens (legacy method-level entries are promoted to whole-type `preserve="all"` with a warning in the Console)
 - Merge existing `link.xml` files from `Assets` and `Packages`
+- Validate the current `Assets/link.xml` against assemblies and types that will be present in the player build
 - Preserve unknown entries and custom XML attributes when importing or merging
 - `ignoreIfMissing` support for assembly entries
 - Custom SDK grouping through `IKnownSdkProvider`
@@ -106,6 +108,40 @@ Press `Merge link.xml` to scan `Assets` and `Packages` for existing `link.xml` f
 Link Guard merges valid files into the current selection, collapses duplicate entries, preserves custom attributes,
 and reports invalid files. After the merge, review the preview and press `Generate link.xml` to write the final
 `Assets/link.xml`.
+
+### Validate link.xml
+Press `Validate` to check the current `Assets/link.xml` against the assemblies and types that will be included in
+the player build.
+
+Link Guard reports stale `<assembly>` and `<type>` entries, then removes them only after confirmation. Entries are
+removed only when they are confidently absent from the build. Editor-only and `UnityEditor.*` entries are removed;
+BCL, `UnityEngine.*`, precompiled, unresolvable entries, wildcard type patterns, and `ignoreIfMissing="true"`
+assemblies are kept.
+
+#### Build-time API (validation)
+For automated pipelines, call the validator from a custom build hook or before starting a player build:
+
+```csharp
+using DTech.LinkGuard.Editor;
+using UnityEditor.Build;
+using UnityEditor.Build.Reporting;
+
+internal sealed class LinkXmlValidationBuildHook : IPreprocessBuildWithReport
+{
+    public int callbackOrder => 0;
+
+    public void OnPreprocessBuild(BuildReport report)
+    {
+        LinkXmlValidationReport validationReport = LinkXmlValidator.Validate(apply: true, throwOnError: true);
+        UnityEngine.Debug.Log(validationReport);
+    }
+}
+```
+
+`LinkXmlValidator.Validate(apply, throwOnError)` reads the current `Assets/link.xml` and returns a
+`LinkXmlValidationReport` with removed and kept entries. With `apply: true`, stale entries are written back to the
+file. With `throwOnError: true`, a parse failure throws `BuildFailedException`, which aborts the build when called
+from a build callback.
 
 ### Custom SDK Groups
 Link Guard includes built-in SDK patterns for common Unity SDKs. You can add project-specific SDK grouping by
