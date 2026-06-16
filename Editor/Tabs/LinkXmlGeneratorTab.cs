@@ -17,6 +17,8 @@ namespace DTech.LinkGuard.Editor
         private const string SplitPxKey = "LinkXmlGenerator.SplitPx";
         private const string Title = "Link XML Generator";
         private const float DefaultPreviewHeight = 220f;
+        
+        private readonly IPrecompiledTypeResolver _typeResolver = new PrecompiledTypeResolver();
 
         public string TabLabel => "link.xml";
         public int Order => 0;
@@ -410,7 +412,7 @@ namespace DTech.LinkGuard.Editor
 
         private void ApplyMergedXmlToTree(string xml)
         {
-            if (!LinkXmlSelectionImporter.Apply(xml, _entries))
+            if (!LinkXmlSelectionImporter.Apply(xml, _entries, _typeResolver))
             {
                 Debug.LogWarning("[LinkXmlGenerator] Failed to import merged link.xml into the tree.");
                 return;
@@ -441,7 +443,7 @@ namespace DTech.LinkGuard.Editor
                 return false;
             }
 
-            if (!LinkXmlSelectionImporter.Apply(xml, _entries))
+            if (!LinkXmlSelectionImporter.Apply(xml, _entries, _typeResolver))
             {
                 Debug.LogWarning($"[LinkXmlGenerator] Failed to import link.xml at {path} into the tree.");
                 return false;
