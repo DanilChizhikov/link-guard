@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
@@ -8,53 +9,54 @@ using UnityEngine.UIElements;
 
 namespace DTech.LinkGuard.Editor
 {
-    internal sealed class LinkXmlGeneratorWindow : EditorWindow
+    internal sealed class LinkXmlGeneratorTab : IGeneratorTab
     {
-        private const string MenuPath = "Window/DTech/" + Title;
         private const string UxmlName = "LinkXmlGeneratorWindow";
         private const string USSName = "LinkXmlGeneratorWindow";
         private const string ShowPreviewKey = "LinkXmlGenerator.ShowPreview";
         private const string SplitPxKey = "LinkXmlGenerator.SplitPx";
         private const string Title = "Link XML Generator";
         private const float DefaultPreviewHeight = 220f;
+        
+        private readonly IPrecompiledTypeResolver _typeResolver = new PrecompiledTypeResolver();
 
+        public string TabLabel => "link.xml";
+        public int Order => 0;
+        public bool IsAvailable => true;
+
+        private VisualElement _root;
         private List<AssemblyEntry> _entries = new();
         private AssemblyTreeController _treeController;
         private PreviewPanel _previewPanel;
         private TwoPaneSplitView _splitter;
         private VisualElement _previewHost;
         private VisualElement _mergeButtonsHost;
+        private IReadOnlyList<ILinkXmlMergeProvider> _mergeProviders;
         private ToolbarToggle _previewToggle;
         private ToolbarButton _generateButton;
         private Label _footerLabel;
         private bool _showPreview;
         private bool _previewDirty;
 
-        [MenuItem(MenuPath)]
-        public static void Open()
+        public VisualElement CreateView()
         {
-            LinkXmlGeneratorWindow window = GetWindow<LinkXmlGeneratorWindow>();
-            window.titleContent = new GUIContent(Title);
-            window.minSize = new Vector2(640f, 480f);
-            window.Show();
-        }
+            _root = new VisualElement();
+            _root.style.flexGrow = 1f;
 
-        public void CreateGUI()
-        {
             VisualTreeAsset tree = Resources.Load<VisualTreeAsset>(UxmlName);
             StyleSheet styles = Resources.Load<StyleSheet>(USSName);
 
             if (tree == null)
             {
-                rootVisualElement.Add(new Label($"Failed to load UXML at {UxmlName}"));
-                return;
+                _root.Add(new Label($"Failed to load UXML at {UxmlName}"));
+                return _root;
             }
 
-            tree.CloneTree(rootVisualElement);
+            tree.CloneTree(_root);
 
             if (styles != null)
             {
-                rootVisualElement.styleSheets.Add(styles);
+                _root.styleSheets.Add(styles);
             }
 
             CacheElements();
@@ -67,17 +69,20 @@ namespace DTech.LinkGuard.Editor
             {
                 EditorApplication.delayCall += Refresh;
             }
+
+            return _root;
         }
 
         private void CacheElements()
         {
-            VisualElement root = rootVisualElement;
+            VisualElement root = _root;
 
             ToolbarButton refreshBtn = root.Q<ToolbarButton>("btn-refresh");
             ToolbarButton selectAllBtn = root.Q<ToolbarButton>("btn-select-all");
             ToolbarButton noneBtn = root.Q<ToolbarButton>("btn-none");
             ToolbarButton loadBtn = root.Q<ToolbarButton>("btn-load");
             ToolbarButton saveBtn = root.Q<ToolbarButton>("btn-save");
+            ToolbarButton validateBtn = root.Q<ToolbarButton>("btn-validate");
             _mergeButtonsHost = root.Q<VisualElement>("merge-buttons");
             _previewToggle = root.Q<ToolbarToggle>("tgl-preview");
             _generateButton = root.Q<ToolbarButton>("btn-generate");
@@ -104,6 +109,7 @@ namespace DTech.LinkGuard.Editor
             noneBtn.clicked += NoneClickedHandler;
             loadBtn.clicked += LoadProfileClickedHandler;
             saveBtn.clicked += SaveProfileClickedHandler;
+            validateBtn.clicked += ValidateClickedHandler;
             _generateButton.clicked += Generate;
 
             BuildMergeButtons();
@@ -120,18 +126,44 @@ namespace DTech.LinkGuard.Editor
             }
 
             _mergeButtonsHost.Clear();
+            _mergeProviders = LinkXmlMergeProviderRegistry.Discover();
 
-            foreach (ILinkXmlMergeProvider provider in LinkXmlMergeProviderRegistry.Discover())
+            if (_mergeProviders.Count == 0)
             {
-                ILinkXmlMergeProvider captured = provider;
-                ToolbarButton button = new ToolbarButton(() => MergeProviderClickedHandler(captured))
+                return;
+            }
+
+            if (_mergeProviders.Count == 1)
+            {
+                ILinkXmlMergeProvider only = _mergeProviders[0];
+                ToolbarButton button = new ToolbarButton(() => MergeProviderClickedHandler(only))
                 {
-                    text = captured.ButtonLabel,
-                    tooltip = captured.Tooltip ?? string.Empty,
+                    text = only.ButtonLabel,
+                    tooltip = only.Tooltip ?? string.Empty,
                 };
                 button.AddToClassList("lxg-tb-btn");
                 _mergeButtonsHost.Add(button);
+                return;
             }
+
+            ToolbarMenu menu = new ToolbarMenu { text = "Merge", tooltip = "Run a single merge provider." };
+            menu.AddToClassList("lxg-tb-btn");
+
+            foreach (ILinkXmlMergeProvider provider in _mergeProviders)
+            {
+                ILinkXmlMergeProvider captured = provider;
+                menu.menu.AppendAction(captured.ButtonLabel, _ => MergeProviderClickedHandler(captured));
+            }
+
+            _mergeButtonsHost.Add(menu);
+
+            ToolbarButton mergeAll = new ToolbarButton(MergeAllClickedHandler)
+            {
+                text = "Merge All",
+                tooltip = "Run every merge provider in order.",
+            };
+            mergeAll.AddToClassList("lxg-tb-btn");
+            _mergeButtonsHost.Add(mergeAll);
         }
 
         private void WireToolbar()
@@ -199,11 +231,134 @@ namespace DTech.LinkGuard.Editor
             UpdateFooter();
         }
 
-        private void MergeProviderClickedHandler(ILinkXmlMergeProvider provider)
+        private void ValidateClickedHandler()
         {
-            if (provider == null)
+            if (!File.Exists(LinkXmlWriter.DefaultPath))
+            {
+                EditorUtility.DisplayDialog(Title, $"No link.xml found at {LinkXmlWriter.DefaultPath}.", "OK");
+                return;
+            }
+
+            LinkXmlValidationReport report;
+
+            try
+            {
+                EditorUtility.DisplayProgressBar(Title, "Validating link.xml...", 0.5f);
+                report = LinkXmlValidator.Validate(apply: false);
+            }
+            finally
+            {
+                EditorUtility.ClearProgressBar();
+            }
+
+            if (!report.Success)
+            {
+                EditorUtility.DisplayDialog(
+                    Title, $"link.xml could not be validated: {report.FailureReason}", "OK");
+                return;
+            }
+
+            if (!report.Changed)
+            {
+                string message = "link.xml is valid. No stale entries found.";
+
+                if (report.KeptUnknown.Count > 0)
+                {
+                    message += $"\n\n{report.KeptUnknown.Count} entries could not be verified and were kept "
+                        + "(see Console).";
+                }
+
+                EditorUtility.DisplayDialog(Title, message, "OK");
+                return;
+            }
+
+            if (!EditorUtility.DisplayDialog(Title, BuildValidationSummary(report), "Remove", "Cancel"))
             {
                 return;
+            }
+
+            LinkXmlValidator.Apply(report);
+            Refresh();
+        }
+
+        private static string BuildValidationSummary(LinkXmlValidationReport report)
+        {
+            const int maxLines = 12;
+
+            StringBuilder builder = new StringBuilder();
+            builder.AppendLine($"Validation found stale entries in {report.OutputPath}:");
+
+            int budget = maxLines;
+            int omitted = 0;
+
+            if (report.RemovedAssemblies.Count > 0)
+            {
+                builder.AppendLine();
+                builder.AppendLine($"Assemblies to remove ({report.RemovedAssemblies.Count}):");
+
+                foreach (string assembly in report.RemovedAssemblies)
+                {
+                    if (budget <= 0)
+                    {
+                        omitted++;
+                        continue;
+                    }
+
+                    builder.AppendLine($"  - {assembly}");
+                    budget--;
+                }
+            }
+
+            if (report.RemovedTypeCount > 0)
+            {
+                builder.AppendLine();
+                builder.AppendLine($"Types to remove ({report.RemovedTypeCount}):");
+
+                foreach (LinkXmlValidationTypeGroup group in report.RemovedTypes)
+                {
+                    foreach (string type in group.TypeNames)
+                    {
+                        if (budget <= 0)
+                        {
+                            omitted++;
+                            continue;
+                        }
+
+                        builder.AppendLine($"  - {group.AssemblyName}: {type}");
+                        budget--;
+                    }
+                }
+            }
+
+            if (omitted > 0)
+            {
+                builder.AppendLine($"  ... and {omitted} more (see Console).");
+            }
+
+            if (report.KeptIgnoreIfMissing.Count > 0 || report.KeptUnknown.Count > 0)
+            {
+                builder.AppendLine();
+                builder.AppendLine(
+                    $"Kept: {report.KeptIgnoreIfMissing.Count} ignoreIfMissing, "
+                    + $"{report.KeptUnknown.Count} unverifiable (see Console).");
+            }
+
+            builder.AppendLine();
+            builder.Append("Remove these entries?");
+
+            return builder.ToString();
+        }
+
+        private enum MergeOutcome { Applied, NoContent, Failed }
+
+        private MergeOutcome RunProvider(ILinkXmlMergeProvider provider, out string report)
+        {
+            report = string.Empty;
+
+            if (provider == null)
+            {
+                report = "No provider.";
+                return MergeOutcome.Failed;
             }
 
             LinkXmlProviderResult result;
@@ -215,29 +370,80 @@ namespace DTech.LinkGuard.Editor
             catch (System.Exception ex)
             {
                 Debug.LogError($"[LinkXmlGenerator] Merge provider '{provider.Id}' threw: {ex}");
-                EditorUtility.DisplayDialog(Title, $"Provider '{provider.Id}' failed: {ex.Message}", "OK");
-                return;
+                report = $"Provider '{provider.Id}' failed: {ex.Message}";
+                return MergeOutcome.Failed;
             }
 
             if (result == null)
             {
-                EditorUtility.DisplayDialog(Title, $"Provider '{provider.Id}' returned no result.", "OK");
-                return;
+                report = $"Provider '{provider.Id}' returned no result.";
+                return MergeOutcome.Failed;
             }
 
             LogProviderWarnings(provider, result);
+            report = result.Report;
 
-            if (!result.Success || !result.HasContent)
+            if (!result.Success)
             {
-                EditorUtility.DisplayDialog(Title, result.Report, "OK");
-                return;
+                return MergeOutcome.Failed;
+            }
+
+            if (!result.HasContent)
+            {
+                return MergeOutcome.NoContent;
             }
 
             ShowPreview();
             ApplyMergedXmlToTree(result.Xml);
 
             Debug.Log($"[LinkXmlGenerator] [{provider.Id}] {result.Report}");
-            EditorUtility.DisplayDialog(Title, result.Report, "OK");
+            return MergeOutcome.Applied;
+        }
+
+        private void MergeProviderClickedHandler(ILinkXmlMergeProvider provider)
+        {
+            if (provider == null)
+            {
+                return;
+            }
+
+            RunProvider(provider, out string report);
+            EditorUtility.DisplayDialog(Title, report, "OK");
+            UpdateFooter();
+        }
+
+        private void MergeAllClickedHandler()
+        {
+            if (_mergeProviders == null || _mergeProviders.Count == 0)
+            {
+                return;
+            }
+
+            int applied = 0;
+            int skipped = 0;
+            int failed = 0;
+            StringBuilder details = new StringBuilder();
+
+            foreach (ILinkXmlMergeProvider provider in _mergeProviders)
+            {
+                MergeOutcome outcome = RunProvider(provider, out string report);
+
+                switch (outcome)
+                {
+                    case MergeOutcome.Applied: applied++; break;
+                    case MergeOutcome.NoContent: skipped++; break;
+                    case MergeOutcome.Failed: failed++; break;
+                }
+
+                details.AppendLine($"[{provider.Id}] {report}");
+            }
+
+            StringBuilder summary = new StringBuilder();
+            summary.AppendLine($"Merge All: {applied} applied, {skipped} skipped, {failed} failed.");
+            summary.AppendLine();
+            summary.Append(details.ToString().TrimEnd());
+
+            EditorUtility.DisplayDialog(Title, summary.ToString(), "OK");
             UpdateFooter();
         }
 
@@ -283,12 +489,13 @@ namespace DTech.LinkGuard.Editor
 
             _showPreview = true;
             _previewToggle.SetValueWithoutNotify(true);
+            EditorPrefs.SetBool(ShowPreviewKey, _showPreview);
             ApplyShowPreview();
         }
 
         private void ApplyMergedXmlToTree(string xml)
         {
-            if (!LinkXmlSelectionImporter.Apply(xml, _entries))
+            if (!LinkXmlSelectionImporter.Apply(xml, _entries, _typeResolver))
             {
                 Debug.LogWarning("[LinkXmlGenerator] Failed to import merged link.xml into the tree.");
                 return;
@@ -319,7 +526,7 @@ namespace DTech.LinkGuard.Editor
                 return false;
             }
 
-            if (!LinkXmlSelectionImporter.Apply(xml, _entries))
+            if (!LinkXmlSelectionImporter.Apply(xml, _entries, _typeResolver))
             {
                 Debug.LogWarning($"[LinkXmlGenerator] Failed to import link.xml at {path} into the tree.");
                 return false;
@@ -356,17 +563,8 @@ namespace DTech.LinkGuard.Editor
             {
                 RebuildPreview();
             }
-            
-            _generateButton.SetEnabled(HasAnySelection());
-        }
 
-        private void OnDisable()
-        {
-            EditorPrefs.SetBool(ShowPreviewKey, _showPreview);
-            if (_previewHost != null && _previewHost.resolvedStyle.height > 0f)
-            {
-                EditorPrefs.SetFloat(SplitPxKey, _previewHost.resolvedStyle.height);
-            }
+            _generateButton.SetEnabled(HasAnySelection());
         }
 
         private void SelectionChangedHandler()
@@ -410,6 +608,7 @@ namespace DTech.LinkGuard.Editor
         private void PreviewToggleChangedHandler(ChangeEvent<bool> evt)
         {
             _showPreview = evt.newValue;
+            EditorPrefs.SetBool(ShowPreviewKey, _showPreview);
             ApplyShowPreview();
             if (_showPreview && !_previewPanel.HasContent)
             {

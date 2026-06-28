@@ -8,6 +8,7 @@
             <ui:VisualElement class="lxg-tb-spacer"/>
             <uie:ToolbarButton name="btn-load" text="Load Profile" class="lxg-tb-btn"/>
             <uie:ToolbarButton name="btn-save" text="Save Profile" class="lxg-tb-btn"/>
+            <uie:ToolbarButton name="btn-validate" text="Validate" class="lxg-tb-btn"/>
             <ui:VisualElement class="lxg-tb-flex"/>
             <ui:VisualElement name="merge-buttons" class="lxg-merge-buttons"/>
             <uie:ToolbarToggle name="tgl-preview" text="Preview" class="lxg-tb-btn"/>
@@ -19,7 +20,7 @@
         </uie:Toolbar>
 
         <ui:VisualElement name="content-area" class="lxg-content">
-            <ui:TwoPaneSplitView name="splitter" orientation="Vertical"
+            <ui:TwoPaneSplitView name="splitter" class="lxg-splitter" orientation="Vertical"
                                  fixed-pane-index="1"
                                  fixed-pane-initial-dimension="220">
                 <ui:VisualElement name="tree-host" class="lxg-tree-host">

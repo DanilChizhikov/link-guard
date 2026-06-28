@@ -21,6 +21,11 @@ namespace DTech.LinkGuard.Editor
                     continue;
                 }
 
+                if (type.GetConstructor(Type.EmptyTypes) == null)
+                {
+                    continue;
+                }
+
                 ILinkXmlMergeProvider provider = TryCreate(type);
 
                 if (provider == null)

@@ -1,10 +1,10 @@
 {
     "name": "com.dtech.link-guard",
     "displayName": "Link Guard",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "unity": "6000.0",
     "description": "Unity editor tool for scanning assemblies and generating or merging link.xml preservation files.",
-    "changelogUrl": "https://github.com/DanilChizhikov/link-guard/releases/tag/v1.1.0",
+    "changelogUrl": "https://github.com/DanilChizhikov/link-guard/releases/tag/v1.2.0",
     "documentationUrl": "https://github.com/DanilChizhikov/link-guard/",
     "keywords": [
         "link.xml",
@@ -12,7 +12,10 @@
         "il2cpp",
         "preserve",
         "unity editor",
-        "upm"
+        "upm",
+        "proguard",
+        "r8",
+        "android"
     ],
     "category": "Tools",
     "author": "DTech",
@@ -25,5 +28,10 @@
         "registry": "https://npm.pkg.github.com/@DanilChizhikov"
     },
     "license": "MIT",
-    "readme": "README.md"
+    "readme": "README.md",
+    "testables": [
+        "com.dtech.linkguard.editor.tests",
+        "com.dtech.linkguard.editor.zenject.tests",
+        "com.dtech.linkguard.editor.proguard.tests"
+    ]
 }
