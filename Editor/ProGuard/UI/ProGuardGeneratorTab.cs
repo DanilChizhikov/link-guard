@@ -12,6 +12,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
         private const string Title = "ProGuard Generator";
         private const string USSName = "LinkXmlGeneratorWindow";
         private const string ShowPreviewKey = "ProGuardGenerator.ShowPreview";
+        private const string BaseRulesExpandedKey = "ProGuardGenerator.BaseRulesExpanded";
 
         public string TabLabel => "ProGuard";
         public int Order => 1;
@@ -25,6 +26,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
         private VisualElement _previewHost;
         private ToolbarToggle _previewToggle;
         private ToolbarButton _generateButton;
+        private TextField _baseRulesField;
         private Label _noticeLabel;
         private Label _footerLabel;
         private bool _showPreview;
@@ -44,6 +46,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
 
             BuildToolbar();
             BuildNotice();
+            BuildBaseRules();
             BuildSearch();
             BuildContent();
             BuildFooter();
@@ -111,6 +114,46 @@ namespace DTech.LinkGuard.Editor.ProGuard
             _noticeLabel.style.paddingBottom = 3f;
             _noticeLabel.style.color = new Color(0.9f, 0.7f, 0.3f);
             _root.Add(_noticeLabel);
+        }
+
+        private void BuildBaseRules()
+        {
+            Foldout foldout = new Foldout
+            {
+                text = "Base ProGuard rules (always added)",
+                value = EditorPrefs.GetBool(BaseRulesExpandedKey, false),
+            };
+            foldout.RegisterValueChangedCallback(evt =>
+                EditorPrefs.SetBool(BaseRulesExpandedKey, evt.newValue));
+
+            Label hint = new Label("Appended verbatim to proguard-user.txt on every generation.");
+            hint.style.whiteSpace = WhiteSpace.Normal;
+            hint.style.opacity = 0.7f;
+            hint.style.marginBottom = 4f;
+            foldout.Add(hint);
+
+            _baseRulesField = new TextField { multiline = true, value = ProGuardBaseRulesStore.Load() };
+            _baseRulesField.style.minHeight = 80f;
+            _baseRulesField.style.whiteSpace = WhiteSpace.Normal;
+            _baseRulesField.RegisterValueChangedCallback(BaseRulesChangedHandler);
+            foldout.Add(_baseRulesField);
+
+            _root.Add(foldout);
+        }
+
+        private void BaseRulesChangedHandler(ChangeEvent<string> evt)
+        {
+            ProGuardBaseRulesStore.Save(evt.newValue);
+
+            if (_showPreview)
+            {
+                RebuildPreview();
+            }
+        }
+
+        private string GetBaseRules()
+        {
+            return _baseRulesField != null ? _baseRulesField.value : string.Empty;
         }
 
         private void BuildSearch()
@@ -212,7 +255,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
                 return;
             }
 
-            string text = ProGuardRulesBuilder.Build(_entries);
+            string text = ProGuardRulesBuilder.Build(_entries, GetBaseRules());
             _previewPanel.SetText(text);
 
             ProGuardWriter.WriteWithConfirmation(text);
@@ -222,7 +265,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
 
         private void RebuildPreview()
         {
-            string text = ProGuardRulesBuilder.Build(_entries);
+            string text = ProGuardRulesBuilder.Build(_entries, GetBaseRules());
             _previewPanel.SetText(text);
         }
 

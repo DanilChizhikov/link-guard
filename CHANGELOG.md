@@ -1,15 +1,11 @@
 # Changelog
 
-## [Unreleased]
+## [1.2.0] - 2026-06-28
 
 ### Added
 - link.xml validation: a **Validate** toolbar button in the generator window checks the current `Assets/link.xml` and removes `<assembly>`/`<type>` entries that will not be in the player build. The window shows a report of the stale entries and removes them only after confirmation
 - Public build-time API `DTech.LinkGuard.Editor.LinkXmlValidator.Validate(apply, throwOnError)` for invocation from external build scripts; returns `LinkXmlValidationReport` with removed/kept entries, and with `throwOnError: true` a parse failure throws `BuildFailedException`
 - Conservative removal policy: entries are removed only when the assembly/type is confidently absent. Editor-only and `UnityEditor.*` assemblies are removed; BCL, `UnityEngine.*`, precompiled, and unresolvable entries are kept. `ignoreIfMissing="true"` assemblies and wildcard type patterns are always kept
-
-## [1.2.0] - 2026-06-09
-
-### Added
 - ProGuard/R8 support: new **ProGuard** tab in the generator window that scans Android artifacts (`.aar`, `.androidlib`, `.jar`, and Java/Kotlin sources) into an artifact → package → class tree and generates `-keep` rules
 - Generated rules are written to `Assets/Plugins/Android/proguard-user.txt` and `PlayerSettings.Android.useCustomProguardFile` is enabled automatically
 - The **Generate ProGuard** button is shown only when the active build target is Android; a notice is displayed when minification (R8) is disabled
