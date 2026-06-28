@@ -13,11 +13,14 @@ namespace DTech.LinkGuard.Editor
         private const string AssemblyElement = "assembly";
         private const string TypeElement = "type";
         private const string MethodElement = "method";
+        private const string FieldElement = "field";
+        private const string PropertyElement = "property";
+        private const string EventElement = "event";
         private const string FullnameAttribute = "fullname";
         private const string PreserveAttribute = "preserve";
         private const string IgnoreIfMissingAttribute = "ignoreIfMissing";
 
-        public static bool Apply(string xml, List<AssemblyEntry> entries)
+        public static bool Apply(string xml, List<AssemblyEntry> entries, IPrecompiledTypeResolver resolver = null)
         {
             if (string.IsNullOrEmpty(xml) || entries == null)
             {
@@ -43,10 +46,9 @@ namespace DTech.LinkGuard.Editor
             ResetEntries(entries);
             LinkXmlPreservation.CaptureDocument(document.Root);
 
-            foreach (XElement assemblyElement in document.Root.Elements()
-                .Where(e => e.Name.LocalName == AssemblyElement))
+            foreach (XElement assemblyElement in document.Root.Elements().Where(e => e.Name.LocalName == AssemblyElement))
             {
-                ApplyAssembly(assemblyElement, entries);
+                ApplyAssembly(assemblyElement, entries, resolver);
             }
 
             return true;
@@ -65,7 +67,7 @@ namespace DTech.LinkGuard.Editor
             }
         }
 
-        private static void ApplyAssembly(XElement assemblyElement, List<AssemblyEntry> entries)
+        private static void ApplyAssembly(XElement assemblyElement, List<AssemblyEntry> entries, IPrecompiledTypeResolver resolver)
         {
             string assemblyName = GetAttributeValue(assemblyElement, FullnameAttribute);
 
@@ -77,10 +79,12 @@ namespace DTech.LinkGuard.Editor
             AssemblyEntry entry = FindAssembly(entries, assemblyName);
             if (entry == null)
             {
+                bool isPrecompiled = resolver != null && resolver.IsKnownAssembly(assemblyName);
+
                 entry = new AssemblyEntry(
                     assemblyName,
-                    AssemblySource.LinkXml,
-                    SyntheticOrigin,
+                    isPrecompiled ? AssemblySource.Unity : AssemblySource.LinkXml,
+                    isPrecompiled ? string.Empty : SyntheticOrigin,
                     Enumerable.Empty<TypeEntry>());
                 entries.Add(entry);
             }
@@ -97,11 +101,11 @@ namespace DTech.LinkGuard.Editor
             foreach (XElement typeElement in assemblyElement.Elements()
                 .Where(e => e.Name.LocalName == TypeElement))
             {
-                ApplyType(typeElement, entry);
+                ApplyType(typeElement, entry, resolver);
             }
         }
 
-        private static void ApplyType(XElement typeElement, AssemblyEntry entry)
+        private static void ApplyType(XElement typeElement, AssemblyEntry entry, IPrecompiledTypeResolver resolver)
         {
             string typeFullname = GetAttributeValue(typeElement, FullnameAttribute);
 
@@ -113,7 +117,9 @@ namespace DTech.LinkGuard.Editor
             TypeEntry type = FindType(entry, typeFullname);
             if (type == null)
             {
-                type = CreateSyntheticType(typeFullname);
+                type = resolver != null && resolver.TryResolveType(entry.Name, typeFullname, out TypeEntry resolved)
+                    ? resolved
+                    : CreateSyntheticType(typeFullname);
                 AddType(entry, type);
             }
 
@@ -125,15 +131,24 @@ namespace DTech.LinkGuard.Editor
                 return;
             }
 
-            bool hasMethodChildren = typeElement.Elements()
-                .Any(e => e.Name.LocalName == MethodElement);
+            bool hasMemberChildren = typeElement.Elements()
+                .Any(e => IsMemberElement(e.Name.LocalName));
 
-            if (hasMethodChildren)
+            if (hasMemberChildren)
             {
                 Debug.LogWarning(
-                    $"[LinkXmlGenerator] Type '{typeFullname}' in assembly '{entry.Name}' had method-level entries; promoted to preserve=\"all\".");
-                type.SelectAll(true);
+                    $"[LinkXmlGenerator] Type '{typeFullname}' in assembly '{entry.Name}' had member-level entries; promoted to preserve=\"all\".");
             }
+
+            type.SelectAll(true);
+        }
+
+        private static bool IsMemberElement(string localName)
+        {
+            return string.Equals(localName, MethodElement, StringComparison.Ordinal)
+                || string.Equals(localName, FieldElement, StringComparison.Ordinal)
+                || string.Equals(localName, PropertyElement, StringComparison.Ordinal)
+                || string.Equals(localName, EventElement, StringComparison.Ordinal);
         }
 
         private static AssemblyEntry FindAssembly(List<AssemblyEntry> entries, string assemblyName)
@@ -143,8 +158,7 @@ namespace DTech.LinkGuard.Editor
 
         private static TypeEntry FindType(AssemblyEntry entry, string typeFullname)
         {
-            return entry.Types.FirstOrDefault(t =>
-                string.Equals(t.LinkerFullname, typeFullname, StringComparison.Ordinal)
+            return entry.Types.FirstOrDefault(t => string.Equals(t.LinkerFullname, typeFullname, StringComparison.Ordinal)
                 || string.Equals(t.Fullname, typeFullname, StringComparison.Ordinal));
         }
 
@@ -210,10 +224,8 @@ namespace DTech.LinkGuard.Editor
 
         private static bool PreservesAll(XElement element)
         {
-            return string.Equals(
-                GetAttributeValue(element, PreserveAttribute),
-                "all",
-                StringComparison.OrdinalIgnoreCase);
+            string value = GetAttributeValue(element, PreserveAttribute);
+            return string.Equals(value, "all", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool IsTruthy(string value)

@@ -26,7 +26,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
                 entry.SelectAll(true);
             }
 
-            string text = ProGuardRulesBuilder.Build(entries);
+            string text = ProGuardRulesBuilder.Build(entries, ProGuardBaseRulesStore.Load());
             if (!ProGuardWriter.Write(text, target))
             {
                 ProGuardPatchReport failed = new ProGuardPatchReport(

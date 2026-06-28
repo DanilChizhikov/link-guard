@@ -29,12 +29,6 @@ namespace DTech.LinkGuard.Editor
             window.Show();
         }
 
-        [MenuItem("Window/DTech/Link XML Generator")]
-        public static void OpenLegacy()
-        {
-            Open();
-        }
-
         public void CreateGUI()
         {
             _tabs.Clear();

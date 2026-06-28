@@ -17,7 +17,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
             AndroidArtifactSource.JavaSource,
         };
 
-        public static string Build(IReadOnlyList<AndroidArtifactEntry> entries)
+        public static string Build(IReadOnlyList<AndroidArtifactEntry> entries, string baseRules = null)
         {
             Dictionary<AndroidArtifactSource, List<string>> bySource =
                 new Dictionary<AndroidArtifactSource, List<string>>();
@@ -47,6 +47,14 @@ namespace DTech.LinkGuard.Editor.ProGuard
 
             StringBuilder builder = new StringBuilder();
             builder.Append(Header).Append('\n');
+
+            string normalizedBase = NormalizeBaseRules(baseRules);
+            if (!string.IsNullOrEmpty(normalizedBase))
+            {
+                builder.Append('\n');
+                builder.Append("# ").Append("Base rules (LinkGuard custom)").Append('\n');
+                builder.Append(normalizedBase).Append('\n');
+            }
 
             foreach (AndroidArtifactSource source in GroupOrder)
             {
@@ -132,6 +140,16 @@ namespace DTech.LinkGuard.Editor.ProGuard
         private static string PackageRule(string package)
         {
             return $"-keep class {package}.** {{ *; }}";
+        }
+
+        private static string NormalizeBaseRules(string baseRules)
+        {
+            if (string.IsNullOrWhiteSpace(baseRules))
+            {
+                return string.Empty;
+            }
+
+            return baseRules.Replace("\r\n", "\n").Replace('\r', '\n').Trim('\n');
         }
 
         public static IReadOnlyList<string> CollapseToRoots(IEnumerable<string> packages)

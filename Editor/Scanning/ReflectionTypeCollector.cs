@@ -74,11 +74,13 @@ namespace DTech.LinkGuard.Editor
             }
         }
 
-        private static void AppendType(Type type, List<TypeEntry> types)
+        public static bool TryCreateEntry(Type type, out TypeEntry entry)
         {
+            entry = null;
+
             if (!ShouldIncludeType(type))
             {
-                return;
+                return false;
             }
 
             string linkerFullname = TypeNameResolver.GetLinkerTypeName(type);
@@ -86,11 +88,21 @@ namespace DTech.LinkGuard.Editor
                 ? linkerFullname
                 : linkerFullname.Substring(type.Namespace.Length + 1);
 
-            types.Add(new TypeEntry(
+            entry = new TypeEntry(
                 type.Namespace,
                 type.FullName,
                 linkerFullname,
-                displayName));
+                displayName);
+
+            return true;
+        }
+
+        private static void AppendType(Type type, List<TypeEntry> types)
+        {
+            if (TryCreateEntry(type, out TypeEntry entry))
+            {
+                types.Add(entry);
+            }
         }
 
         private static bool ShouldIncludeType(Type type)
