@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.2.1] - 2026-07-16
+
+### Fixed
+- Added the missing Unity meta file for `Editor/ProGuard/ProGuardBaseRulesStore.cs` so package import and version control keep the ProGuard base rules asset script metadata intact
+
 ## [1.2.0] - 2026-06-28
 
 ### Added
