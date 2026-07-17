@@ -114,6 +114,19 @@ namespace DTech.LinkGuard.Editor
                 return;
             }
 
+            if (typeFullname.EndsWith(".*", StringComparison.Ordinal))
+            {
+                string nsName = typeFullname.Substring(0, typeFullname.Length - 2);
+                NamespaceEntry ns = entry.Namespaces.FirstOrDefault(n =>
+                    string.Equals(n.Fullname, nsName, StringComparison.Ordinal));
+
+                if (ns != null && ns.Types.Count > 0)
+                {
+                    ns.IsSelected = true;
+                    return;
+                }
+            }
+
             TypeEntry type = FindType(entry, typeFullname);
             if (type == null)
             {
@@ -136,8 +149,8 @@ namespace DTech.LinkGuard.Editor
 
             if (hasMemberChildren)
             {
-                Debug.LogWarning(
-                    $"[LinkXmlGenerator] Type '{typeFullname}' in assembly '{entry.Name}' had member-level entries; promoted to preserve=\"all\".");
+                Debug.LogWarning($"[LinkXmlGenerator] Type '{typeFullname}' " +
+                    $"in assembly '{entry.Name}' had member-level entries; promoted to preserve=\"all\".");
             }
 
             type.SelectAll(true);
