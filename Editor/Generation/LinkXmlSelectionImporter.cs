@@ -12,6 +12,7 @@ namespace DTech.LinkGuard.Editor
         private const string LinkerElement = "linker";
         private const string AssemblyElement = "assembly";
         private const string TypeElement = "type";
+        private const string NamespaceElement = "namespace";
         private const string MethodElement = "method";
         private const string FieldElement = "field";
         private const string PropertyElement = "property";
@@ -98,11 +99,50 @@ namespace DTech.LinkGuard.Editor
                 return;
             }
 
+            foreach (XElement namespaceElement in assemblyElement.Elements()
+                .Where(e => e.Name.LocalName == NamespaceElement))
+            {
+                ApplyNamespace(namespaceElement, entry);
+            }
+
             foreach (XElement typeElement in assemblyElement.Elements()
                 .Where(e => e.Name.LocalName == TypeElement))
             {
                 ApplyType(typeElement, entry, resolver);
             }
+        }
+
+        private static void ApplyNamespace(XElement namespaceElement, AssemblyEntry entry)
+        {
+            string namespaceName = GetAttributeValue(namespaceElement, FullnameAttribute);
+
+            if (string.IsNullOrEmpty(namespaceName) || !PreservesAll(namespaceElement))
+            {
+                return;
+            }
+
+            NamespaceEntry ns = entry.Namespaces.FirstOrDefault(n =>
+                string.Equals(n.Fullname, namespaceName, StringComparison.Ordinal));
+
+            if (ns != null && ns.Types.Count > 0)
+            {
+                ns.IsSelected = true;
+                return;
+            }
+            
+            TypeEntry synthetic = CreateSyntheticNamespaceType(namespaceName);
+            AddType(entry, synthetic);
+            synthetic.SelectAll(true);
+        }
+
+        private static TypeEntry CreateSyntheticNamespaceType(string namespaceName)
+        {
+            return new TypeEntry(
+                namespaceName,
+                namespaceName + ".*",
+                namespaceName + ".*",
+                "*",
+                true);
         }
 
         private static void ApplyType(XElement typeElement, AssemblyEntry entry, IPrecompiledTypeResolver resolver)

@@ -9,6 +9,7 @@ namespace DTech.LinkGuard.Editor
     {
         private const string AssemblyElement = "assembly";
         private const string TypeElement = "type";
+        private const string NamespaceElement = "namespace";
         private const string MethodElement = "method";
         private const string FullnameAttribute = "fullname";
         private const string PreserveAttribute = "preserve";
@@ -71,7 +72,28 @@ namespace DTech.LinkGuard.Editor
         public static void CaptureAssembly(AssemblyEntry entry, XElement assemblyElement)
         {
             CaptureAttributes(entry.LinkXmlAttributes, assemblyElement, IsModeledAssemblyAttribute);
-            CaptureChildren(entry.LinkXmlChildren, assemblyElement, TypeElement);
+            entry.LinkXmlChildren.Clear();
+            entry.LinkXmlChildren.AddRange(assemblyElement.Elements()
+                .Where(e => !IsRegeneratedAssemblyChild(e))
+                .Select(CloneElement));
+        }
+
+        private static bool IsRegeneratedAssemblyChild(XElement element)
+        {
+            if (IsElement(element, TypeElement))
+            {
+                return true;
+            }
+            
+            return IsElement(element, NamespaceElement) && IsAllPreserveElement(element);
+        }
+
+        private static bool IsAllPreserveElement(XElement element)
+        {
+            return string.Equals(
+                element.Attribute(PreserveAttribute)?.Value,
+                "all",
+                StringComparison.OrdinalIgnoreCase);
         }
 
         public static void CaptureType(TypeEntry type, XElement typeElement)

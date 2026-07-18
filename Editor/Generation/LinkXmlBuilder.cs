@@ -64,7 +64,7 @@ namespace DTech.LinkGuard.Editor
                 {
                     if (CanCollapse(ns))
                     {
-                        assembly.Add(BuildNamespaceWildcardElement(ns));
+                        assembly.Add(BuildNamespaceElement(ns));
                         continue;
                     }
 
@@ -86,11 +86,11 @@ namespace DTech.LinkGuard.Editor
                 && ns.Types.All(t => t.LinkXmlAttributes.Count == 0 && t.LinkXmlChildren.Count == 0);
         }
 
-        private static XElement BuildNamespaceWildcardElement(NamespaceEntry ns)
+        private static XElement BuildNamespaceElement(NamespaceEntry ns)
         {
             return new XElement(
-                "type",
-                new XAttribute("fullname", ns.Fullname + ".*"),
+                "namespace",
+                new XAttribute("fullname", ns.Fullname),
                 new XAttribute("preserve", "all"));
         }
 

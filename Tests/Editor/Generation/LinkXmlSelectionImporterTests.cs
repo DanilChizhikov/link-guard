@@ -67,6 +67,51 @@ namespace DTech.LinkGuard.Editor.Tests
         }
 
         [Test]
+        public void Apply_NamespaceElementPreserveAll_SelectsWholeNamespace()
+        {
+            List<AssemblyEntry> entries = new List<AssemblyEntry> { MakeEntry("Game.Core", "Foo", "Bar") };
+
+            bool result = LinkXmlSelectionImporter.Apply(
+                "<linker><assembly fullname=\"Game.Core\"><namespace fullname=\"Game.Core\" preserve=\"all\"/></assembly></linker>",
+                entries);
+
+            Assert.That(result, Is.True);
+            Assert.That(entries[0].IsAssemblySelected, Is.False);
+            Assert.That(entries[0].Types.All(t => t.IsSelected), Is.True);
+        }
+
+        [Test]
+        public void Apply_LegacyTypeWildcard_SelectsWholeNamespace()
+        {
+            List<AssemblyEntry> entries = new List<AssemblyEntry> { MakeEntry("Game.Core", "Foo", "Bar") };
+
+            LinkXmlSelectionImporter.Apply(
+                "<linker><assembly fullname=\"Game.Core\"><type fullname=\"Game.Core.*\" preserve=\"all\"/></assembly></linker>",
+                entries);
+
+            Assert.That(entries[0].Types.All(t => t.IsSelected), Is.True);
+        }
+
+        [Test]
+        public void Apply_UnknownNamespaceElement_RoundTripsViaSynthetic()
+        {
+            List<AssemblyEntry> entries = new List<AssemblyEntry> { MakeEntry("Game.Core", "Foo") };
+
+            LinkXmlSelectionImporter.Apply(
+                "<linker><assembly fullname=\"Game.Core\"><namespace fullname=\"Absent.Space\" preserve=\"all\"/></assembly></linker>",
+                entries);
+
+            TypeEntry synthetic = entries[0].Types.FirstOrDefault(t => t.Namespace == "Absent.Space");
+            Assert.That(synthetic, Is.Not.Null);
+            Assert.That(synthetic!.IsSynthetic, Is.True);
+            Assert.That(synthetic.IsSelected, Is.True);
+
+            // The imported namespace survives a regenerate as a <namespace> entry.
+            string xml = LinkXmlBuilder.Build(entries);
+            Assert.That(xml, Does.Contain("<namespace fullname=\"Absent.Space\" preserve=\"all\" />"));
+        }
+
+        [Test]
         public void Apply_LegacyMethodChildren_PromotesTypeToPreserveAll_AndWarns()
         {
             LogAssert.Expect(LogType.Warning,
