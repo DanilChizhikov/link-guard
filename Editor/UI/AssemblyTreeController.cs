@@ -86,14 +86,7 @@ namespace DTech.LinkGuard.Editor
 
             foreach (AssemblyEntry entry in _entries)
             {
-                if (value)
-                {
-                    entry.IsAssemblySelected = true;
-                }
-                else
-                {
-                    entry.SelectAll(false);
-                }
+                entry.SelectAll(value);
             }
 
             _tree.RefreshItems();
@@ -146,39 +139,8 @@ namespace DTech.LinkGuard.Editor
                         continue;
                     }
 
-                    List<TreeViewItemData<AssemblyTreeNode>> namespaceItems = new();
-
-                    foreach (NamespaceEntry ns in entry.Namespaces)
-                    {
-                        if (!MatchesNamespace(entry, ns))
-                        {
-                            continue;
-                        }
-
-                        List<TreeViewItemData<AssemblyTreeNode>> typeItems = new();
-
-                        foreach (TypeEntry type in ns.Types)
-                        {
-                            if (!MatchesType(entry, ns, type))
-                            {
-                                continue;
-                            }
-
-                            typeItems.Add(new TreeViewItemData<AssemblyTreeNode>(
-                                NextId(),
-                                AssemblyTreeNode.ForType(entry, ns, type)));
-                        }
-
-                        if (typeItems.Count == 0)
-                        {
-                            continue;
-                        }
-
-                        namespaceItems.Add(new TreeViewItemData<AssemblyTreeNode>(
-                            NextId(),
-                            AssemblyTreeNode.ForNamespace(entry, ns),
-                            typeItems));
-                    }
+                    List<NamespaceSurvivor> survivors = CollectNamespaceSurvivors(entry);
+                    List<TreeViewItemData<AssemblyTreeNode>> namespaceItems = BuildNamespaceItems(entry, survivors);
 
                     assemblyItems.Add(new TreeViewItemData<AssemblyTreeNode>(
                         NextId(),
@@ -198,6 +160,112 @@ namespace DTech.LinkGuard.Editor
             }
 
             return roots;
+        }
+
+        private List<NamespaceSurvivor> CollectNamespaceSurvivors(AssemblyEntry entry)
+        {
+            List<NamespaceSurvivor> survivors = new();
+
+            foreach (NamespaceEntry ns in entry.Namespaces)
+            {
+                if (!MatchesNamespace(entry, ns))
+                {
+                    continue;
+                }
+
+                List<TypeEntry> matchedTypes = new();
+
+                foreach (TypeEntry type in ns.Types)
+                {
+                    if (MatchesType(entry, ns, type))
+                    {
+                        matchedTypes.Add(type);
+                    }
+                }
+
+                if (matchedTypes.Count == 0)
+                {
+                    continue;
+                }
+
+                string[] segments = ns.Fullname.Length == 0
+                    ? Array.Empty<string>()
+                    : ns.Fullname.Split('.');
+
+                survivors.Add(new NamespaceSurvivor(ns, segments, matchedTypes));
+            }
+
+            return survivors;
+        }
+
+        private List<TreeViewItemData<AssemblyTreeNode>> BuildNamespaceItems(AssemblyEntry entry,
+            List<NamespaceSurvivor> survivors)
+        {
+            List<TreeViewItemData<AssemblyTreeNode>> items = new();
+
+            foreach (NamespaceSurvivor global in survivors.Where(s => s.Segments.Length == 0))
+            {
+                items.Add(new TreeViewItemData<AssemblyTreeNode>(
+                    NextId(),
+                    AssemblyTreeNode.ForNamespaceSegment(entry, string.Empty, string.Empty, global.Namespace,
+                        new[] { global.Namespace }),
+                    BuildTypeItems(entry, global.Types)));
+            }
+
+            List<NamespaceSurvivor> named = survivors.Where(s => s.Segments.Length > 0).ToList();
+            AppendSegmentNodes(entry, named, string.Empty, 0, items);
+
+            return items;
+        }
+
+        private void AppendSegmentNodes(AssemblyEntry entry, List<NamespaceSurvivor> subtree, string parentPath,
+            int depth, List<TreeViewItemData<AssemblyTreeNode>> target)
+        {
+            IEnumerable<IGrouping<string, NamespaceSurvivor>> groups = subtree
+                .Where(s => s.Segments.Length > depth)
+                .GroupBy(s => s.Segments[depth])
+                .OrderBy(g => g.Key, StringComparer.Ordinal);
+
+            foreach (IGrouping<string, NamespaceSurvivor> group in groups)
+            {
+                string label = group.Key;
+                string path = depth == 0 ? label : $"{parentPath}.{label}";
+                target.Add(BuildSegmentNode(entry, label, path, depth + 1, group.ToList()));
+            }
+        }
+
+        private TreeViewItemData<AssemblyTreeNode> BuildSegmentNode(AssemblyEntry entry, string segmentLabel,
+            string segmentPath, int depth, List<NamespaceSurvivor> subtree)
+        {
+            List<TreeViewItemData<AssemblyTreeNode>> children = new();
+
+            AppendSegmentNodes(entry, subtree, segmentPath, depth, children);
+
+            NamespaceSurvivor own = subtree.FirstOrDefault(s => s.Segments.Length == depth);
+            NamespaceEntry ownNamespace = own.Namespace;
+
+            if (ownNamespace != null)
+            {
+                children.AddRange(BuildTypeItems(entry, own.Types));
+            }
+
+            return new TreeViewItemData<AssemblyTreeNode>(
+                NextId(),
+                AssemblyTreeNode.ForNamespaceSegment(entry, segmentLabel, segmentPath, ownNamespace,
+                    subtree.Select(s => s.Namespace).ToList()),
+                children);
+        }
+
+        private List<TreeViewItemData<AssemblyTreeNode>> BuildTypeItems(AssemblyEntry entry, List<TypeEntry> types)
+        {
+            List<TreeViewItemData<AssemblyTreeNode>> items = new(types.Count);
+
+            foreach (TypeEntry type in types)
+            {
+                items.Add(new TreeViewItemData<AssemblyTreeNode>(NextId(), AssemblyTreeNode.ForType(entry, type)));
+            }
+
+            return items;
         }
 
         private bool MatchesAssembly(AssemblyEntry entry)
@@ -393,27 +461,36 @@ namespace DTech.LinkGuard.Editor
         private void BindNamespace(AssemblyTreeNode node, Toggle toggle, Label label, Label meta, Label pill,
             Toggle ignoreToggle)
         {
-            NamespaceEntry ns = node.Namespace;
+            IReadOnlyList<NamespaceEntry> subtree = node.SubtreeNamespaces;
+
+            int total = 0;
+            int selected = 0;
+
+            foreach (NamespaceEntry ns in subtree)
+            {
+                total += ns.Types.Count;
+                selected += ns.SelectedTypeCount;
+            }
 
             toggle.style.display = DisplayStyle.Flex;
-            toggle.SetValueWithoutNotify(ns.IsSelected);
+            toggle.SetValueWithoutNotify(total > 0 && selected == total);
             toggle.RegisterValueChangedCallback(_namespaceToggleCallback);
-            toggle.userData = ns;
+            toggle.userData = SelectionToggleContext.ForNamespaces(node.Assembly, subtree);
 
-            if (string.IsNullOrEmpty(ns.Fullname))
+            if (node.SegmentPath.Length == 0)
             {
                 label.AddToClassList(GlobalLabelClass);
                 label.text = GlobalNamespaceLabel;
             }
             else
             {
-                label.text = HighlightMatch(ns.Fullname);
+                label.text = HighlightMatch(node.SegmentLabel);
             }
 
             ApplyDisabledState(label, node.Assembly, appendSuffix: false);
 
             meta.style.display = DisplayStyle.Flex;
-            meta.text = $"[{ns.SelectedTypeCount}/{ns.Types.Count} types]";
+            meta.text = $"[{selected}/{total} types]";
 
             pill.style.display = DisplayStyle.None;
             ignoreToggle.style.display = DisplayStyle.None;
@@ -427,7 +504,7 @@ namespace DTech.LinkGuard.Editor
             toggle.style.display = DisplayStyle.Flex;
             toggle.SetValueWithoutNotify(type.IsSelected);
             toggle.RegisterValueChangedCallback(_typeToggleCallback);
-            toggle.userData = type;
+            toggle.userData = SelectionToggleContext.ForType(node.Assembly, type);
 
             label.text = HighlightMatch(type.DisplayName);
             ApplyDisabledState(label, node.Assembly, appendSuffix: false);
@@ -525,17 +602,32 @@ namespace DTech.LinkGuard.Editor
 
         private static void NamespaceToggleHandler(ChangeEvent<bool> evt)
         {
-            if (evt.target is not Toggle toggle || toggle.userData is not NamespaceEntry ns)
+            if (evt.target is not Toggle toggle || toggle.userData is not SelectionToggleContext context
+                || context.Namespaces == null)
             {
                 return;
             }
 
-            ns.IsSelected = evt.newValue;
-            if (!evt.newValue)
+            if (context.Assembly != null)
             {
-                foreach (TypeEntry type in ns.Types)
+                if (context.Assembly.IsAssemblySelected)
                 {
-                    LinkXmlPreservation.ClearType(type);
+                    context.Assembly.SelectAll(true);
+                }
+
+                context.Assembly.IsAssemblySelected = false;
+            }
+
+            foreach (NamespaceEntry ns in context.Namespaces)
+            {
+                ns.IsSelected = evt.newValue;
+
+                if (!evt.newValue)
+                {
+                    foreach (TypeEntry type in ns.Types)
+                    {
+                        LinkXmlPreservation.ClearType(type);
+                    }
                 }
             }
 
@@ -544,15 +636,26 @@ namespace DTech.LinkGuard.Editor
 
         private static void TypeToggleHandler(ChangeEvent<bool> evt)
         {
-            if (evt.target is not Toggle toggle || toggle.userData is not TypeEntry type)
+            if (evt.target is not Toggle toggle || toggle.userData is not SelectionToggleContext context
+                || context.Type == null)
             {
                 return;
             }
 
-            type.SelectAll(evt.newValue);
+            if (context.Assembly != null)
+            {
+                if (context.Assembly.IsAssemblySelected)
+                {
+                    context.Assembly.SelectAll(true);
+                }
+
+                context.Assembly.IsAssemblySelected = false;
+            }
+
+            context.Type.SelectAll(evt.newValue);
             if (!evt.newValue)
             {
-                LinkXmlPreservation.ClearType(type);
+                LinkXmlPreservation.ClearType(context.Type);
             }
 
             FindController(toggle)?.HandleSelectionChanged();
@@ -590,6 +693,47 @@ namespace DTech.LinkGuard.Editor
         {
             _tree.RefreshItems();
             OnChanged?.Invoke();
+        }
+
+        private sealed class SelectionToggleContext
+        {
+            public AssemblyEntry Assembly { get; }
+            public IReadOnlyList<NamespaceEntry> Namespaces { get; }
+            public TypeEntry Type { get; }
+
+            private SelectionToggleContext(AssemblyEntry assembly,
+                IReadOnlyList<NamespaceEntry> namespaces,
+                TypeEntry type)
+            {
+                Assembly = assembly;
+                Namespaces = namespaces;
+                Type = type;
+            }
+
+            public static SelectionToggleContext ForNamespaces(AssemblyEntry assembly,
+                IReadOnlyList<NamespaceEntry> namespaces)
+            {
+                return new SelectionToggleContext(assembly, namespaces, null);
+            }
+
+            public static SelectionToggleContext ForType(AssemblyEntry assembly, TypeEntry type)
+            {
+                return new SelectionToggleContext(assembly, null, type);
+            }
+        }
+
+        private readonly struct NamespaceSurvivor
+        {
+            public readonly NamespaceEntry Namespace;
+            public readonly string[] Segments;
+            public readonly List<TypeEntry> Types;
+
+            public NamespaceSurvivor(NamespaceEntry ns, string[] segments, List<TypeEntry> types)
+            {
+                Namespace = ns;
+                Segments = segments;
+                Types = types;
+            }
         }
     }
 }

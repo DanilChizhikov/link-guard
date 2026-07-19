@@ -43,19 +43,78 @@ namespace DTech.LinkGuard.Editor.Tests
         }
 
         [Test]
-        public void Build_TypeSelectedNotAssembly_AddsPerTypePreserveAll()
+        public void Build_PartialNamespace_AddsPerTypePreserveAll_NotCollapsed()
         {
-            TypeEntry type = MakeType("Ns", "Foo");
-            type.IsSelected = true;
-            AssemblyEntry entry = MakeEntry("Game.Core", AssemblySource.Project, type);
+            TypeEntry selected = MakeType("Ns", "Foo");
+            selected.IsSelected = true;
+            TypeEntry unselected = MakeType("Ns", "Bar");
+            AssemblyEntry entry = MakeEntry("Game.Core", AssemblySource.Project, selected, unselected);
 
             XElement assembly = ParseFirstAssembly(LinkXmlBuilder.Build(new[] { entry }));
 
             Assert.That(assembly.Attribute("preserve"), Is.Null);
+            Assert.That(assembly.Elements("namespace"), Is.Empty);
+            Assert.That(assembly.Elements("type").Count(), Is.EqualTo(1));
             XElement typeElement = assembly.Element("type");
             Assert.That(typeElement, Is.Not.Null);
             Assert.That(typeElement.Attribute("fullname")?.Value, Is.EqualTo("Ns.Foo"));
             Assert.That(typeElement.Attribute("preserve")?.Value, Is.EqualTo("all"));
+        }
+
+        [Test]
+        public void Build_NamespaceFullySelected_CollapsesToNamespaceElement_NoWildcard()
+        {
+            TypeEntry a = MakeType("Ns", "Foo");
+            a.IsSelected = true;
+            TypeEntry b = MakeType("Ns", "Bar");
+            b.IsSelected = true;
+            AssemblyEntry entry = MakeEntry("Game.Core", AssemblySource.Project, a, b);
+
+            XElement assembly = ParseFirstAssembly(LinkXmlBuilder.Build(new[] { entry }));
+
+            Assert.That(assembly.Elements("type"), Is.Empty);
+            XElement nsElement = assembly.Element("namespace");
+            Assert.That(nsElement, Is.Not.Null);
+            Assert.That(nsElement.Attribute("fullname")?.Value, Is.EqualTo("Ns"));
+            Assert.That(nsElement.Attribute("preserve")?.Value, Is.EqualTo("all"));
+            Assert.That(assembly.ToString(), Does.Not.Contain("*"));
+        }
+
+        [Test]
+        public void Build_ParentAndChildNamespaceSelected_EmitsTwoDisjointNamespaces_NoWildcard()
+        {
+            TypeEntry parent = MakeType("A.B", "Cam");
+            parent.IsSelected = true;
+            TypeEntry child = MakeType("A.B.C", "CmCam");
+            child.IsSelected = true;
+            AssemblyEntry entry = MakeEntry("Game", AssemblySource.Project, parent, child);
+
+            XElement assembly = ParseFirstAssembly(LinkXmlBuilder.Build(new[] { entry }));
+            List<string> namespaces = assembly.Elements("namespace")
+                .Select(n => n.Attribute("fullname")!.Value)
+                .ToList();
+
+            Assert.That(namespaces, Is.EqualTo(new[] { "A.B", "A.B.C" }));
+            Assert.That(assembly.Elements("type"), Is.Empty);
+            Assert.That(assembly.ToString(), Does.Not.Contain("*"));
+        }
+
+        [Test]
+        public void Build_ParentSelectedChildNot_EmitsParentNamespaceOnly_NoLeakIntoChild()
+        {
+            TypeEntry parent = MakeType("A.B", "Cam");
+            parent.IsSelected = true;
+            TypeEntry child = MakeType("A.B.C", "CmCam");
+            AssemblyEntry entry = MakeEntry("Game", AssemblySource.Project, parent, child);
+
+            XElement assembly = ParseFirstAssembly(LinkXmlBuilder.Build(new[] { entry }));
+            List<string> namespaces = assembly.Elements("namespace")
+                .Select(n => n.Attribute("fullname")!.Value)
+                .ToList();
+
+            Assert.That(namespaces, Is.EqualTo(new[] { "A.B" }));
+            Assert.That(assembly.ToString(), Does.Not.Contain("A.B.C"));
+            Assert.That(assembly.ToString(), Does.Not.Contain("*"));
         }
 
         [Test]
@@ -162,7 +221,9 @@ namespace DTech.LinkGuard.Editor.Tests
             t2.IsSelected = true;
             TypeEntry t3 = MakeType("Ns", "Bravo");
             t3.IsSelected = true;
-            AssemblyEntry entry = MakeEntry("Game.Core", AssemblySource.Project, t1, t2, t3);
+            // Unselected type keeps the namespace from collapsing so per-type entries are emitted.
+            TypeEntry unselected = MakeType("Ns", "Zulu");
+            AssemblyEntry entry = MakeEntry("Game.Core", AssemblySource.Project, t1, t2, t3, unselected);
 
             XElement assembly = ParseFirstAssembly(LinkXmlBuilder.Build(new[] { entry }));
             List<string> typeOrder = assembly.Elements("type")

@@ -1,5 +1,6 @@
 #if LINKGUARD_ZENJECT_ENABLED
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Xml.Linq;
 using UnityEditor;
@@ -22,7 +23,23 @@ namespace DTech.LinkGuard.Editor.Zenject
             string normalizedPath = string.IsNullOrEmpty(linkXmlPath) ? DefaultPath : linkXmlPath;
             ZenjectScanResult scan = ZenjectMergeProvider.Run();
 
-            XDocument document = LoadOrCreateDocument(normalizedPath);
+            XDocument document = LoadOrCreateDocument(normalizedPath, out string loadFailure);
+
+            if (document == null)
+            {
+                string reason = $"Existing link.xml at {normalizedPath} could not be used: {loadFailure}. Nothing written.";
+                Debug.LogError($"[LinkXmlGenerator] [zenject] {reason}");
+
+                List<string> warnings = new List<string>(scan.Warnings) { reason };
+                return new ZenjectPatchReport(
+                    normalizedPath,
+                    0,
+                    0,
+                    scan.ReachableInstallerCount,
+                    scan.IgnoredInstallerCount,
+                    warnings);
+            }
+
             XElement linker = document.Root;
 
             int added = 0;
@@ -95,8 +112,10 @@ namespace DTech.LinkGuard.Editor.Zenject
                 scan.Warnings);
         }
 
-        private static XDocument LoadOrCreateDocument(string path)
+        private static XDocument LoadOrCreateDocument(string path, out string failureReason)
         {
+            failureReason = string.Empty;
+
             if (!File.Exists(path))
             {
                 return new XDocument(new XElement(LinkerElement));
@@ -108,16 +127,16 @@ namespace DTech.LinkGuard.Editor.Zenject
                 if (document.Root == null
                     || !string.Equals(document.Root.Name.LocalName, LinkerElement, StringComparison.Ordinal))
                 {
-                    return new XDocument(new XElement(LinkerElement));
+                    failureReason = "root element is not <linker>";
+                    return null;
                 }
 
                 return document;
             }
             catch (Exception ex)
             {
-                Debug.LogWarning(
-                    $"[LinkXmlGenerator] [zenject] failed to load existing link.xml at {path}: {ex.Message}. Creating fresh document.");
-                return new XDocument(new XElement(LinkerElement));
+                failureReason = ex.Message;
+                return null;
             }
         }
 

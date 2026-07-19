@@ -27,6 +27,28 @@ namespace DTech.LinkGuard.Editor
                 CollectFromOutput(assembly.outputPath, types);
             }
 
+            return Deduplicate(types);
+        }
+
+        public static List<TypeEntry> Collect(string assemblyName, string assemblyPath,
+            IReadOnlyDictionary<string, Assembly> loadedByName)
+        {
+            List<TypeEntry> types = new List<TypeEntry>();
+
+            if (loadedByName.TryGetValue(assemblyName, out Assembly loaded))
+            {
+                CollectFromLoaded(loaded, types);
+            }
+            else if (!string.IsNullOrEmpty(assemblyPath) && File.Exists(assemblyPath))
+            {
+                CollectFromOutput(assemblyPath, types);
+            }
+
+            return Deduplicate(types);
+        }
+
+        private static List<TypeEntry> Deduplicate(List<TypeEntry> types)
+        {
             return types
                 .GroupBy(t => t.LinkerFullname)
                 .Select(g => g.First())

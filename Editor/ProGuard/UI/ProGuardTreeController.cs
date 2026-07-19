@@ -75,14 +75,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
         {
             foreach (AndroidArtifactEntry entry in _entries)
             {
-                if (value)
-                {
-                    entry.IsArtifactSelected = true;
-                }
-                else
-                {
-                    entry.SelectAll(false);
-                }
+                entry.SelectAll(value);
             }
 
             _tree.RefreshItems();

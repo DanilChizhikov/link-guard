@@ -70,18 +70,37 @@ namespace DTech.LinkGuard.Editor.Tests
         }
 
         [Test]
-        public void CaptureAssembly_StoresNonTypeChildren()
+        public void CaptureAssembly_StoresNonTypeChildren_ExcludesModeledTypeAndPreserveAllNamespace()
         {
             AssemblyEntry entry = new AssemblyEntry("A", AssemblySource.Project, "/p", null);
             XElement assemblyXml = new XElement("assembly",
                 new XAttribute("fullname", "A"),
                 new XElement("type", new XAttribute("fullname", "A.Foo")),
+                new XElement("namespace",
+                    new XAttribute("fullname", "A.Ns"),
+                    new XAttribute("preserve", "all")),
                 new XElement("custom-element"));
 
             LinkXmlPreservation.CaptureAssembly(entry, assemblyXml);
 
             Assert.That(entry.LinkXmlChildren, Has.Count.EqualTo(1));
             Assert.That(entry.LinkXmlChildren[0].Name.LocalName, Is.EqualTo("custom-element"));
+        }
+
+        [Test]
+        public void CaptureAssembly_KeepsNonAllPreserveNamespace_AsOpaqueChild()
+        {
+            AssemblyEntry entry = new AssemblyEntry("A", AssemblySource.Project, "/p", null);
+            XElement assemblyXml = new XElement("assembly",
+                new XAttribute("fullname", "A"),
+                new XElement("namespace",
+                    new XAttribute("fullname", "A.Ns"),
+                    new XAttribute("preserve", "fields")));
+
+            LinkXmlPreservation.CaptureAssembly(entry, assemblyXml);
+
+            Assert.That(entry.LinkXmlChildren, Has.Count.EqualTo(1));
+            Assert.That(entry.LinkXmlChildren[0].Name.LocalName, Is.EqualTo("namespace"));
         }
 
         [Test]
