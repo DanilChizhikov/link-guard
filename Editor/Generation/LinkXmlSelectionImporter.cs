@@ -191,6 +191,13 @@ namespace DTech.LinkGuard.Editor
             {
                 Debug.LogWarning($"[LinkXmlGenerator] Type '{typeFullname}' " +
                     $"in assembly '{entry.Name}' had member-level entries; promoted to preserve=\"all\".");
+                type.SelectAll(true);
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(GetAttributeValue(typeElement, PreserveAttribute)))
+            {
+                return;
             }
 
             type.SelectAll(true);

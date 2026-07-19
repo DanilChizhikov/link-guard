@@ -252,6 +252,55 @@ namespace DTech.LinkGuard.Editor.Tests
         }
 
         [Test]
+        public void Merge_ChildlessTypeWithoutPreserve_IsNotDowngradedByPreserveNothing()
+        {
+            string a = Write("<linker><assembly fullname=\"X\"><type fullname=\"X.Foo\"/></assembly></linker>");
+            string b = Write("<linker><assembly fullname=\"X\"><type fullname=\"X.Foo\" preserve=\"nothing\"/></assembly></linker>");
+
+            string xml = LinkXmlMerger.Merge(new[] { a, b }).Xml;
+            XElement type = ParseAssemblies(xml).Single().Element("type")!;
+
+            Assert.That(type.Attribute("preserve")!.Value, Is.EqualTo("all"));
+        }
+
+        [Test]
+        public void Merge_PreserveNothingFirst_ChildlessTypeSecond_UpgradesToAll()
+        {
+            string a = Write("<linker><assembly fullname=\"X\"><type fullname=\"X.Foo\" preserve=\"nothing\"/></assembly></linker>");
+            string b = Write("<linker><assembly fullname=\"X\"><type fullname=\"X.Foo\"/></assembly></linker>");
+
+            string xml = LinkXmlMerger.Merge(new[] { a, b }).Xml;
+            XElement type = ParseAssemblies(xml).Single().Element("type")!;
+
+            Assert.That(type.Attribute("preserve")!.Value, Is.EqualTo("all"));
+        }
+
+        [Test]
+        public void Merge_ChildlessAssemblyWithoutPreserve_UpgradesOverIncomingPreserve()
+        {
+            string a = Write("<linker><assembly fullname=\"X\"/></linker>");
+            string b = Write("<linker><assembly fullname=\"X\" preserve=\"fields\"/></linker>");
+
+            string xml = LinkXmlMerger.Merge(new[] { a, b }).Xml;
+            XElement assembly = ParseAssemblies(xml).Single();
+
+            Assert.That(assembly.Attribute("preserve")!.Value, Is.EqualTo("all"));
+        }
+
+        [Test]
+        public void Merge_TypeWithMemberChildren_DoesNotMaterializePreserve_AndAcceptsIncomingRank()
+        {
+            string a = Write("<linker><assembly fullname=\"X\"><type fullname=\"X.Foo\"><method signature=\"void Run()\"/></type></assembly></linker>");
+            string b = Write("<linker><assembly fullname=\"X\"><type fullname=\"X.Foo\" preserve=\"fields\"/></assembly></linker>");
+
+            string xml = LinkXmlMerger.Merge(new[] { a, b }).Xml;
+            XElement type = ParseAssemblies(xml).Single().Element("type")!;
+
+            Assert.That(type.Attribute("preserve")!.Value, Is.EqualTo("fields"));
+            Assert.That(type.Elements("method").Count(), Is.EqualTo(1));
+        }
+
+        [Test]
         public void Merge_SortsAttributes_FullnamePreserveIgnoreIfMissingThenAlpha()
         {
             string a = Write("<linker><assembly fullname=\"X\" zeta=\"1\"/></linker>");

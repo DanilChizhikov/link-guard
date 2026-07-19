@@ -30,12 +30,13 @@ namespace DTech.LinkGuard.Editor.ProGuard
 
         public static bool Write(string text, string targetPath = DefaultPath)
         {
-            if (!ProGuardBuildSettings.EnableCustomProguardFile())
+            string normalized = string.IsNullOrEmpty(targetPath) ? DefaultPath : targetPath;
+            
+            if (string.Equals(normalized, DefaultPath, StringComparison.Ordinal)
+                && !ProGuardBuildSettings.EnableCustomProguardFile())
             {
                 return false;
             }
-
-            string normalized = string.IsNullOrEmpty(targetPath) ? DefaultPath : targetPath;
             string directory = Path.GetDirectoryName(normalized);
 
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))

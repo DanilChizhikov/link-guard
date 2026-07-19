@@ -13,12 +13,24 @@ namespace DTech.LinkGuard.Editor
 {
     internal sealed class PlayerBuildMembershipOracle : IBuildMembershipOracle
     {
+        private readonly struct ResolvedAssembly
+        {
+            public Assembly Assembly { get; }
+            public bool IsPlayerExact { get; }
+
+            public ResolvedAssembly(Assembly assembly, bool isPlayerExact)
+            {
+                Assembly = assembly;
+                IsPlayerExact = isPlayerExact;
+            }
+        }
+        
         private static readonly CompilationPipeline.PrecompiledAssemblySources _precompiledSources =
             CompilationPipeline.PrecompiledAssemblySources.UserAssembly |
             CompilationPipeline.PrecompiledAssemblySources.UnityEngine |
             CompilationPipeline.PrecompiledAssemblySources.SystemAssembly;
 
-        private readonly Dictionary<string, Assembly> _reflectionCache = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, ResolvedAssembly> _reflectionCache = new(StringComparer.Ordinal);
         private readonly HashSet<string> _playerNames = new(StringComparer.Ordinal);
         private readonly HashSet<string> _editorNames = new(StringComparer.Ordinal);
         private readonly HashSet<string> _precompiledEditorNames = new(StringComparer.Ordinal);
@@ -96,8 +108,8 @@ namespace DTech.LinkGuard.Editor
 
             EnsureInitialized();
 
-            Assembly handle = ResolveReflectionAssembly(assemblyName);
-            if (handle == null)
+            ResolvedAssembly handle = ResolveReflectionAssembly(assemblyName);
+            if (handle.Assembly == null)
             {
                 return BuildPresence.Unknown;
             }
@@ -106,8 +118,14 @@ namespace DTech.LinkGuard.Editor
 
             try
             {
-                Type type = handle.GetType(reflectionName, throwOnError: false);
-                return type != null ? BuildPresence.Present : BuildPresence.Missing;
+                Type type = handle.Assembly.GetType(reflectionName, throwOnError: false);
+
+                if (type != null)
+                {
+                    return BuildPresence.Present;
+                }
+                
+                return handle.IsPlayerExact ? BuildPresence.Missing : BuildPresence.Unknown;
             }
             catch
             {
@@ -161,47 +179,48 @@ namespace DTech.LinkGuard.Editor
                 || assemblyName.StartsWith("UnityEditor.", StringComparison.Ordinal);
         }
 
-        private Assembly ResolveReflectionAssembly(string assemblyName)
+        private ResolvedAssembly ResolveReflectionAssembly(string assemblyName)
         {
-            if (_reflectionCache.TryGetValue(assemblyName, out Assembly cached))
+            if (_reflectionCache.TryGetValue(assemblyName, out ResolvedAssembly cached))
             {
                 return cached;
             }
 
-            Assembly resolved = null;
-            if (_loadedByName.TryGetValue(assemblyName, out Assembly loaded))
+            ResolvedAssembly resolved;
+            if (_precompiledPlayerPaths.TryGetValue(assemblyName, out string precompiled)
+                && File.Exists(precompiled))
             {
-                resolved = loaded;
+                resolved = new ResolvedAssembly(LoadFromPath(assemblyName, precompiled), isPlayerExact: true);
+            }
+            else if (_playerOutputPaths.TryGetValue(assemblyName, out string outputPath)
+                && File.Exists(outputPath))
+            {
+                resolved = new ResolvedAssembly(LoadFromPath(assemblyName, outputPath), isPlayerExact: false);
+            }
+            else if (_loadedByName.TryGetValue(assemblyName, out Assembly loaded))
+            {
+                resolved = new ResolvedAssembly(loaded, isPlayerExact: false);
             }
             else
             {
-                string path = null;
-
-                if (_playerOutputPaths.TryGetValue(assemblyName, out string outputPath) && File.Exists(outputPath))
-                {
-                    path = outputPath;
-                }
-                else if (_precompiledPlayerPaths.TryGetValue(assemblyName, out string precompiled)
-                    && File.Exists(precompiled))
-                {
-                    path = precompiled;
-                }
-
-                if (!string.IsNullOrEmpty(path))
-                {
-                    try
-                    {
-                        resolved = Assembly.LoadFrom(path);
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.LogWarning($"[LinkXmlGenerator] Failed to load assembly '{assemblyName}' from {path}: {ex.Message}");
-                    }
-                }
+                resolved = default;
             }
 
             _reflectionCache[assemblyName] = resolved;
             return resolved;
+        }
+
+        private static Assembly LoadFromPath(string assemblyName, string path)
+        {
+            try
+            {
+                return Assembly.LoadFrom(path);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[LinkXmlGenerator] Failed to load assembly '{assemblyName}' from {path}: {ex.Message}");
+                return null;
+            }
         }
 
         private void EnsureInitialized()

@@ -147,6 +147,7 @@ namespace DTech.LinkGuard.Editor
             }
 
             duplicatesCollapsed++;
+            MaterializeImplicitPreserveAll(incoming);
             MergeAttributes(existing, incoming);
 
             if (PreservesAll(existing) && IsContainerElement(existing))
@@ -179,6 +180,8 @@ namespace DTech.LinkGuard.Editor
                 clone.Add(CloneWithoutWhitespace(child));
             }
 
+            MaterializeImplicitPreserveAll(clone);
+
             if (PreservesAll(clone) && IsContainerElement(clone))
             {
                 clone.RemoveNodes();
@@ -187,6 +190,18 @@ namespace DTech.LinkGuard.Editor
             SortChildren(clone);
 
             return clone;
+        }
+
+        private static void MaterializeImplicitPreserveAll(XElement element)
+        {
+            if (!IsContainerElement(element)
+                || element.Attribute(PreserveAttribute) != null
+                || element.Elements().Any())
+            {
+                return;
+            }
+
+            element.Add(new XAttribute(PreserveAttribute, "all"));
         }
 
         private static void MergeAttributes(XElement target, XElement incoming)

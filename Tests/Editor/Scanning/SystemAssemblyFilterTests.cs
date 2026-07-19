@@ -60,10 +60,12 @@ namespace DTech.LinkGuard.Editor.Tests
             Assert.That(SystemAssemblyFilter.ShouldExclude(name), Is.True);
         }
 
-        [Test]
-        public void ShouldExclude_NamesThatHappenToShareSystemPrefix_AreAlsoExcluded()
+        [TestCase("Systematic")]
+        [TestCase("Systems")]
+        [TestCase("Systems.Core")]
+        public void ShouldExclude_UserAssembliesSharingSystemPrefix_AreAllowed(string name)
         {
-            Assert.That(SystemAssemblyFilter.ShouldExclude("Systematic"), Is.True);
+            Assert.That(SystemAssemblyFilter.ShouldExclude(name), Is.False);
         }
     }
 }

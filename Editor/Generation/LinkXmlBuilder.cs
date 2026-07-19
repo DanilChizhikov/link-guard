@@ -41,10 +41,7 @@ namespace DTech.LinkGuard.Editor
         {
             XElement assembly = new XElement("assembly", new XAttribute("fullname", entry.Name));
 
-            bool wholeAssembly = entry.IsAssemblySelected
-                || (entry.TypeCount > 0
-                    && entry.SelectedTypeCount == entry.TypeCount
-                    && entry.Types.All(t => t.LinkXmlAttributes.Count == 0 && t.LinkXmlChildren.Count == 0));
+            bool wholeAssembly = entry.IsAssemblySelected;
 
             if (wholeAssembly)
             {

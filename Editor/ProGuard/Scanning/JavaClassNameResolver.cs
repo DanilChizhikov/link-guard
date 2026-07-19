@@ -2,22 +2,6 @@ using System;
 
 namespace DTech.LinkGuard.Editor.ProGuard
 {
-    internal readonly struct ResolvedJavaClass
-    {
-        public readonly string Fullname;
-        public readonly string Package;
-        public readonly string SimpleName;
-        public readonly bool IsInner;
-
-        public ResolvedJavaClass(string fullname, string package, string simpleName, bool isInner)
-        {
-            Fullname = fullname;
-            Package = package;
-            SimpleName = simpleName;
-            IsInner = isInner;
-        }
-    }
-
     internal static class JavaClassNameResolver
     {
         private const string ClassExtension = ".class";
@@ -34,6 +18,11 @@ namespace DTech.LinkGuard.Editor.ProGuard
             string normalized = entryPath.Replace('\\', '/');
 
             if (!normalized.EndsWith(ClassExtension, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+            
+            if (normalized.StartsWith("META-INF/", StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }

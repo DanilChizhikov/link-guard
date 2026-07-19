@@ -233,6 +233,36 @@ namespace DTech.LinkGuard.Editor.Tests
             Assert.That(entries[0].IgnoreIfMissing, Is.False);
         }
 
+        [Test]
+        public void Apply_TypeWithNonAllPreserve_NoMembers_IsNotSelected_AndRoundTripsVerbatim()
+        {
+            List<AssemblyEntry> entries = new List<AssemblyEntry> { MakeEntry("Game.Core", "Foo") };
+
+            LinkXmlSelectionImporter.Apply(
+                "<linker><assembly fullname=\"Game.Core\"><type fullname=\"Game.Core.Foo\" preserve=\"fields\"/></assembly></linker>",
+                entries);
+
+            TypeEntry type = entries[0].Types.First(t => t.LinkerFullname == "Game.Core.Foo");
+            Assert.That(type.IsSelected, Is.False);
+            Assert.That(type.ProducesEntry, Is.True);
+
+            string xml = LinkXmlBuilder.Build(entries);
+            Assert.That(xml, Does.Contain("preserve=\"fields\""));
+            Assert.That(xml, Does.Not.Contain("Game.Core.Foo\" preserve=\"all\""));
+        }
+
+        [Test]
+        public void Apply_TypeWithoutPreserveAndWithoutMembers_TreatedAsImplicitAll_Selected()
+        {
+            List<AssemblyEntry> entries = new List<AssemblyEntry> { MakeEntry("Game.Core", "Foo") };
+
+            LinkXmlSelectionImporter.Apply(
+                "<linker><assembly fullname=\"Game.Core\"><type fullname=\"Game.Core.Foo\"/></assembly></linker>",
+                entries);
+
+            Assert.That(entries[0].Types.First(t => t.LinkerFullname == "Game.Core.Foo").IsSelected, Is.True);
+        }
+
         private static AssemblyEntry MakeEntry(string assemblyName, params string[] typeShortNames)
         {
             List<TypeEntry> types = new List<TypeEntry>();

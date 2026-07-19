@@ -86,14 +86,7 @@ namespace DTech.LinkGuard.Editor
 
             foreach (AssemblyEntry entry in _entries)
             {
-                if (value)
-                {
-                    entry.IsAssemblySelected = true;
-                }
-                else
-                {
-                    entry.SelectAll(false);
-                }
+                entry.SelectAll(value);
             }
 
             _tree.RefreshItems();
@@ -482,7 +475,7 @@ namespace DTech.LinkGuard.Editor
             toggle.style.display = DisplayStyle.Flex;
             toggle.SetValueWithoutNotify(total > 0 && selected == total);
             toggle.RegisterValueChangedCallback(_namespaceToggleCallback);
-            toggle.userData = subtree;
+            toggle.userData = SelectionToggleContext.ForNamespaces(node.Assembly, subtree);
 
             if (node.SegmentPath.Length == 0)
             {
@@ -511,7 +504,7 @@ namespace DTech.LinkGuard.Editor
             toggle.style.display = DisplayStyle.Flex;
             toggle.SetValueWithoutNotify(type.IsSelected);
             toggle.RegisterValueChangedCallback(_typeToggleCallback);
-            toggle.userData = type;
+            toggle.userData = SelectionToggleContext.ForType(node.Assembly, type);
 
             label.text = HighlightMatch(type.DisplayName);
             ApplyDisabledState(label, node.Assembly, appendSuffix: false);
@@ -609,12 +602,18 @@ namespace DTech.LinkGuard.Editor
 
         private static void NamespaceToggleHandler(ChangeEvent<bool> evt)
         {
-            if (evt.target is not Toggle toggle || toggle.userData is not IReadOnlyList<NamespaceEntry> namespaces)
+            if (evt.target is not Toggle toggle || toggle.userData is not SelectionToggleContext context
+                || context.Namespaces == null)
             {
                 return;
             }
 
-            foreach (NamespaceEntry ns in namespaces)
+            if (context.Assembly != null)
+            {
+                context.Assembly.IsAssemblySelected = false;
+            }
+
+            foreach (NamespaceEntry ns in context.Namespaces)
             {
                 ns.IsSelected = evt.newValue;
 
@@ -632,15 +631,21 @@ namespace DTech.LinkGuard.Editor
 
         private static void TypeToggleHandler(ChangeEvent<bool> evt)
         {
-            if (evt.target is not Toggle toggle || toggle.userData is not TypeEntry type)
+            if (evt.target is not Toggle toggle || toggle.userData is not SelectionToggleContext context
+                || context.Type == null)
             {
                 return;
             }
 
-            type.SelectAll(evt.newValue);
+            if (context.Assembly != null)
+            {
+                context.Assembly.IsAssemblySelected = false;
+            }
+
+            context.Type.SelectAll(evt.newValue);
             if (!evt.newValue)
             {
-                LinkXmlPreservation.ClearType(type);
+                LinkXmlPreservation.ClearType(context.Type);
             }
 
             FindController(toggle)?.HandleSelectionChanged();
@@ -678,6 +683,33 @@ namespace DTech.LinkGuard.Editor
         {
             _tree.RefreshItems();
             OnChanged?.Invoke();
+        }
+
+        private sealed class SelectionToggleContext
+        {
+            public AssemblyEntry Assembly { get; }
+            public IReadOnlyList<NamespaceEntry> Namespaces { get; }
+            public TypeEntry Type { get; }
+
+            private SelectionToggleContext(AssemblyEntry assembly,
+                IReadOnlyList<NamespaceEntry> namespaces,
+                TypeEntry type)
+            {
+                Assembly = assembly;
+                Namespaces = namespaces;
+                Type = type;
+            }
+
+            public static SelectionToggleContext ForNamespaces(AssemblyEntry assembly,
+                IReadOnlyList<NamespaceEntry> namespaces)
+            {
+                return new SelectionToggleContext(assembly, namespaces, null);
+            }
+
+            public static SelectionToggleContext ForType(AssemblyEntry assembly, TypeEntry type)
+            {
+                return new SelectionToggleContext(assembly, null, type);
+            }
         }
 
         private readonly struct NamespaceSurvivor
