@@ -84,7 +84,7 @@ namespace DTech.LinkGuard.Editor
             {
                 return true;
             }
-            
+
             return IsElement(element, NamespaceElement) && IsAllPreserveElement(element);
         }
 

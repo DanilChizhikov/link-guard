@@ -21,7 +21,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
             {
                 return false;
             }
-            
+
             if (normalized.StartsWith("META-INF/", StringComparison.OrdinalIgnoreCase))
             {
                 return false;

@@ -24,7 +24,7 @@ namespace DTech.LinkGuard.Editor
                 IsPlayerExact = isPlayerExact;
             }
         }
-        
+
         private static readonly CompilationPipeline.PrecompiledAssemblySources _precompiledSources =
             CompilationPipeline.PrecompiledAssemblySources.UserAssembly |
             CompilationPipeline.PrecompiledAssemblySources.UnityEngine |
@@ -124,7 +124,7 @@ namespace DTech.LinkGuard.Editor
                 {
                     return BuildPresence.Present;
                 }
-                
+
                 return handle.IsPlayerExact ? BuildPresence.Missing : BuildPresence.Unknown;
             }
             catch

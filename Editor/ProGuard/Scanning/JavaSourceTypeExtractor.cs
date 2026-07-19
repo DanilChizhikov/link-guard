@@ -33,7 +33,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
             {
                 package = packageMatch.Groups[1].Value;
             }
-            
+
             int depth = 0;
             Dictionary<string, int> indexByName = new Dictionary<string, int>(StringComparer.Ordinal);
             int lastTopLevelIndex = -1;

@@ -129,7 +129,7 @@ namespace DTech.LinkGuard.Editor
                 ns.IsSelected = true;
                 return;
             }
-            
+
             TypeEntry synthetic = CreateSyntheticNamespaceType(namespaceName);
             AddType(entry, synthetic);
             synthetic.SelectAll(true);

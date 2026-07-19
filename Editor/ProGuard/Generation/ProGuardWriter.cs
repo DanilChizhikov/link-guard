@@ -31,7 +31,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
         public static bool Write(string text, string targetPath = DefaultPath)
         {
             string normalized = string.IsNullOrEmpty(targetPath) ? DefaultPath : targetPath;
-            
+
             if (string.Equals(normalized, DefaultPath, StringComparison.Ordinal)
                 && !ProGuardBuildSettings.EnableCustomProguardFile())
             {

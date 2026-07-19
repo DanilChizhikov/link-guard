@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using UnityEditor;
 using UnityEngine;
 using PackageInfo = UnityEditor.PackageManager.PackageInfo;
 using PackageSource = UnityEditor.PackageManager.PackageSource;
@@ -88,7 +89,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
 
             foreach (string aar in aarFiles)
             {
-                if (IsUnderLib(aar) || !IsAndroidPath(aar))
+                if (IsUnderLib(aar) || !IsIncludedInAndroidBuild(aar, roots, root))
                 {
                     continue;
                 }
@@ -112,7 +113,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
 
             foreach (string jar in jarFiles)
             {
-                if (IsUnderLib(jar) || !IsAndroidPath(jar))
+                if (IsUnderLib(jar) || !IsIncludedInAndroidBuild(jar, roots, root))
                 {
                     continue;
                 }
@@ -234,6 +235,21 @@ namespace DTech.LinkGuard.Editor.ProGuard
             return Normalize(path).IndexOf("/android", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
+        private static bool IsIncludedInAndroidBuild(
+            string path, IReadOnlyList<SearchRoot> roots, string normalizedProjectRoot)
+        {
+            string assetPath = ResolveStableOrigin(path, roots, normalizedProjectRoot);
+            PluginImporter importer = AssetImporter.GetAtPath(assetPath) as PluginImporter;
+
+            if (importer == null)
+            {
+                return true;
+            }
+
+            return importer.GetCompatibleWithAnyPlatform()
+                || importer.GetCompatibleWithPlatform(BuildTarget.Android);
+        }
+
         private static List<SearchRoot> CollectSearchRoots(string normalizedProjectRoot)
         {
             List<SearchRoot> roots = new List<SearchRoot>();
@@ -280,7 +296,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
 
             return roots;
         }
-        
+
         internal static string ResolveStableOrigin(string path, IReadOnlyList<SearchRoot> roots, string normalizedProjectRoot)
         {
             string normalized = Normalize(path);
