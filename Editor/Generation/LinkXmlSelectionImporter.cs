@@ -154,7 +154,7 @@ namespace DTech.LinkGuard.Editor
                 return;
             }
 
-            if (typeFullname.EndsWith(".*", StringComparison.Ordinal))
+            if (typeFullname.EndsWith(".*", StringComparison.Ordinal) && PreservesAll(typeElement))
             {
                 string nsName = typeFullname.Substring(0, typeFullname.Length - 2);
                 NamespaceEntry ns = entry.Namespaces.FirstOrDefault(n =>

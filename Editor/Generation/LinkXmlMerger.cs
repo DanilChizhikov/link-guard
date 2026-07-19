@@ -11,6 +11,7 @@ namespace DTech.LinkGuard.Editor
         private const string LinkerElement = "linker";
         private const string AssemblyElement = "assembly";
         private const string TypeElement = "type";
+        private const string NamespaceElement = "namespace";
         private const string MethodElement = "method";
         private const string FullnameAttribute = "fullname";
         private const string SignatureAttribute = "signature";
@@ -294,7 +295,8 @@ namespace DTech.LinkGuard.Editor
             string elementName = element.Name.LocalName;
 
             return string.Equals(elementName, AssemblyElement, StringComparison.Ordinal)
-                || string.Equals(elementName, TypeElement, StringComparison.Ordinal);
+                || string.Equals(elementName, TypeElement, StringComparison.Ordinal)
+                || string.Equals(elementName, NamespaceElement, StringComparison.Ordinal);
         }
 
         private static bool PreservesAll(XElement element)
@@ -357,12 +359,17 @@ namespace DTech.LinkGuard.Editor
                 return 1;
             }
 
-            if (string.Equals(elementName, MethodElement, StringComparison.Ordinal))
+            if (string.Equals(elementName, NamespaceElement, StringComparison.Ordinal))
             {
                 return 2;
             }
 
-            return 3;
+            if (string.Equals(elementName, MethodElement, StringComparison.Ordinal))
+            {
+                return 3;
+            }
+
+            return 4;
         }
 
         private static void SortAttributes(XElement element)

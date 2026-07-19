@@ -88,7 +88,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
 
             foreach (string aar in aarFiles)
             {
-                if (IsUnderLib(aar))
+                if (IsUnderLib(aar) || !IsAndroidPath(aar))
                 {
                     continue;
                 }
@@ -112,7 +112,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
 
             foreach (string jar in jarFiles)
             {
-                if (IsUnderLib(jar))
+                if (IsUnderLib(jar) || !IsAndroidPath(jar))
                 {
                     continue;
                 }

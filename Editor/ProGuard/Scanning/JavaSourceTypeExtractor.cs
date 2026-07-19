@@ -11,7 +11,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
             new Regex(@"(?m)^\s*package\s+([A-Za-z_$][\w$.]*)", RegexOptions.Compiled);
 
         private static readonly Regex _token = new Regex(
-            @"\b(?:class|interface|enum|object)\s+(?<type>[A-Za-z_$][\w$]*)" +
+            @"\b(?:enum\s+class|class|interface|enum|object)\s+(?<type>[A-Za-z_$][\w$]*)" +
             @"|(?<open>\{)" +
             @"|(?<close>\})",
             RegexOptions.Compiled);

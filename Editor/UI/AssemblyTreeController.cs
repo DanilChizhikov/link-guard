@@ -610,6 +610,11 @@ namespace DTech.LinkGuard.Editor
 
             if (context.Assembly != null)
             {
+                if (context.Assembly.IsAssemblySelected)
+                {
+                    context.Assembly.SelectAll(true);
+                }
+
                 context.Assembly.IsAssemblySelected = false;
             }
 
@@ -639,6 +644,11 @@ namespace DTech.LinkGuard.Editor
 
             if (context.Assembly != null)
             {
+                if (context.Assembly.IsAssemblySelected)
+                {
+                    context.Assembly.SelectAll(true);
+                }
+
                 context.Assembly.IsAssemblySelected = false;
             }
 

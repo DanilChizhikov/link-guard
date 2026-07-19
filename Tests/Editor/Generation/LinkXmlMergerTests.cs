@@ -378,6 +378,24 @@ namespace DTech.LinkGuard.Editor.Tests
             Assert.That(result.DuplicatesCollapsed, Is.EqualTo(1));
         }
 
+        [Test]
+        public void MergeContents_NamespaceImplicitAll_NotDowngradedByPreserveNothing()
+        {
+            LinkXmlMergeInput implicitAll = new LinkXmlMergeInput(
+                "a", "<linker><assembly fullname=\"X\"><namespace fullname=\"N\"/></assembly></linker>");
+            LinkXmlMergeInput nothing = new LinkXmlMergeInput(
+                "b", "<linker><assembly fullname=\"X\"><namespace fullname=\"N\" preserve=\"nothing\"/></assembly></linker>");
+
+            LinkXmlMergeResult result = LinkXmlMerger.Merge(new[] { implicitAll, nothing });
+
+            XElement ns = XDocument.Parse(result.Xml).Root!
+                .Elements("assembly").Single()
+                .Elements("namespace").Single();
+
+            Assert.That(ns.Attribute("fullname")!.Value, Is.EqualTo("N"));
+            Assert.That(ns.Attribute("preserve")!.Value, Is.EqualTo("all"));
+        }
+
         private string Write(string content)
         {
             string path = Path.Combine(_tempDirectory, Guid.NewGuid().ToString("N") + ".xml");

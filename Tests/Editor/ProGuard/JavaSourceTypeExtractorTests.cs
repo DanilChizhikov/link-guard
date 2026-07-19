@@ -111,6 +111,35 @@ namespace DTech.LinkGuard.Editor.ProGuard.Tests
         }
 
         [Test]
+        public void Extract_KotlinEnumClass_ReturnsEnumName()
+        {
+            const string source =
+                "package com.example\n" +
+                "enum class Color {\n" +
+                "    RED, GREEN\n" +
+                "}\n";
+
+            IReadOnlyList<JavaSourceType> types = JavaSourceTypeExtractor.Extract(source, out string package);
+
+            Assert.That(package, Is.EqualTo("com.example"));
+            Assert.That(types.Select(t => t.SimpleName), Is.EqualTo(new[] { "Color" }));
+        }
+
+        [Test]
+        public void Extract_JavaEnum_ReturnsEnumName()
+        {
+            const string source =
+                "package com.example;\n" +
+                "public enum Foo {\n" +
+                "    A, B\n" +
+                "}\n";
+
+            IReadOnlyList<JavaSourceType> types = JavaSourceTypeExtractor.Extract(source, out _);
+
+            Assert.That(types.Select(t => t.SimpleName), Is.EqualTo(new[] { "Foo" }));
+        }
+
+        [Test]
         public void Extract_NoPackage_ReturnsEmptyPackage()
         {
             const string source = "class Standalone {\n}\n";
