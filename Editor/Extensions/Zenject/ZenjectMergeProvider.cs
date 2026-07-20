@@ -188,47 +188,5 @@ namespace DTech.LinkGuard.Editor.Zenject
             return builder.ToString();
         }
     }
-
-    internal sealed class ZenjectScanResult
-    {
-        public IReadOnlyCollection<TypeIdentifier> LinkEntries { get; }
-        public IReadOnlyList<string> Warnings { get; }
-        public string Report { get; }
-        public int ReachableInstallerCount { get; }
-        public int IgnoredInstallerCount { get; }
-
-        public ZenjectScanResult(
-            IReadOnlyCollection<TypeIdentifier> linkEntries,
-            IReadOnlyList<string> warnings,
-            string report,
-            int reachableInstallerCount,
-            int ignoredInstallerCount)
-        {
-            LinkEntries = linkEntries ?? Array.Empty<TypeIdentifier>();
-            Warnings = warnings ?? Array.Empty<string>();
-            Report = report ?? string.Empty;
-            ReachableInstallerCount = reachableInstallerCount;
-            IgnoredInstallerCount = ignoredInstallerCount;
-        }
-    }
-
-    internal sealed class TypeIdentifierFromRuntime
-    {
-        public TypeIdentifier Identifier { get; }
-
-        public TypeIdentifierFromRuntime(Type type)
-        {
-            string assemblyName = type.Assembly.GetName().Name;
-            string fullname = type.FullName?.Replace('+', '/') ?? type.Name;
-
-            int genericMark = fullname.IndexOf('[');
-            if (genericMark >= 0)
-            {
-                fullname = fullname.Substring(0, genericMark);
-            }
-
-            Identifier = TypeIdentifier.From(assemblyName, fullname);
-        }
-    }
 }
 #endif

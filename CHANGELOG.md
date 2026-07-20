@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.3.0] - 2026-07-20
+
+### Added
+- Namespace-level preservation: a fully selected namespace collapses to a single `<namespace fullname="..." preserve="all"/>` entry instead of listing every type. The assembly tree is now a hierarchical, segmented namespace tree with namespace-level selection, and import, merge, and preservation understand `<namespace>` elements and `namespace.*` wildcard type patterns
+- Precompiled (DLL) assembly scanning: user precompiled assemblies from `CompilationPipeline.GetPrecompiledAssemblyPaths` are scanned, filtered to those actually included in the player build (via `PluginImporter` platform compatibility), resolved to package-relative paths, and collected by reflection
+- ProGuard scanning of registered UPM packages: `AndroidArtifactScanner` now collects search roots from non-embedded UPM packages in addition to `Assets`/`Packages`, resolves stable `Packages/<name>/...` origins, and skips artifacts not included in the Android build
+- Brace-depth-aware Java/Kotlin type parser (`JavaSourceTypeExtractor`) that strips line, block, and nested Kotlin comments, string/char literals, and Kotlin raw strings before detecting top-level types and their inner classes, replacing the previous package/type regex
+
+### Changed
+- Validation is more conservative: `PlayerBuildMembershipOracle` distinguishes player-exact assemblies (precompiled player paths / player output) from merely-loaded ones. A type missing from a non-exact assembly now reports `Unknown` instead of `Missing`, preventing false removals
+- Split one type per file across the Zenject, Profiles, and ProGuard modules; no public API changes
+
+### Fixed
+- System-assembly filter: the `System` prefix is now matched as `System.` (bare `System` moved to exact-name exclusion), so assemblies merely starting with "System" are no longer wrongly excluded
+- ProGuard writer only toggles `PlayerSettings.Android.useCustomProguardFile` when writing to the default path; a custom target path no longer flips the player setting
+- ProGuard scanning skips `META-INF/` entries
+- Zenject patcher no longer overwrites a malformed existing `link.xml`: if the root is not `<linker>` or the file cannot be parsed, it aborts and reports the failure instead of losing data
+- `link.xml` import no longer force-selects types that already carry a non-`all` `preserve` attribute
+
+### Removed
+- Legacy `Window/DTech/Link XML Generator` menu alias; the window is opened only via `Window/DTech/Link Guard`
+
 ## [1.2.1] - 2026-07-16
 
 ### Fixed
