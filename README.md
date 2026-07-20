@@ -50,9 +50,9 @@ shrinker — the native-side counterpart of `link.xml`.
     ```
 3. Unity will automatically import the package.
 
-If you want to set a target version, Link Guard uses the `v*.*.*` release tag so you can specify a version like #v1.0.0.
+If you want to set a target version, Link Guard uses the `v*.*.*` release tag so you can specify a version like #v1.3.1.
 
-For example `https://github.com/DanilChizhikov/link-guard.git#v1.0.0`.
+For example `https://github.com/DanilChizhikov/link-guard.git#v1.3.1`.
 
 ## Features
 - Assembly scanning for project code, plugins, precompiled DLLs, UPM packages, known SDKs, and Unity modules (precompiled assemblies filtered to those included in the player build)
