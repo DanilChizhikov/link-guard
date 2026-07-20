@@ -1,5 +1,7 @@
 # Link Guard
 [![Unity Version](https://img.shields.io/badge/unity-6000.0+-000.svg)](https://unity.com/releases/editor/archive)
+![Unity Tests](https://github.com/DanilChizhikov/link-guard/actions/workflows/tests.yml/badge.svg?branch=master)
+[![openupm](https://img.shields.io/npm/v/com.dtech.link-guard?label=openupm&registry_uri=https://package.openupm.com)](https://openupm.com/packages/com.dtech.link-guard/)
 
 ## Overview
 Link Guard is a Unity editor tool for building `link.xml` files used by managed code stripping and IL2CPP builds.
