@@ -5,8 +5,9 @@
 
 ## Overview
 Link Guard is a Unity editor tool for building `link.xml` files used by managed code stripping and IL2CPP builds.
-It scans project assemblies, plugins, UPM packages, known SDKs, and Unity modules, then lets you choose which
-assemblies or types should be preserved.
+It scans project assemblies, precompiled plugin DLLs, UPM packages, known SDKs, and Unity modules, then lets you
+choose which assemblies, namespaces, or types should be preserved. A fully selected namespace collapses to a single
+`<namespace preserve="all"/>` entry instead of listing every type.
 
 The editor window is a modular tab host. Alongside the `link.xml` tab, a **ProGuard** tab scans Android artifacts
 (`.aar`, `.androidlib`, `.jar`, and Java/Kotlin sources) and generates `-keep` rules for the Android R8/ProGuard
@@ -54,10 +55,11 @@ If you want to set a target version, Link Guard uses the `v*.*.*` release tag so
 For example `https://github.com/DanilChizhikov/link-guard.git#v1.0.0`.
 
 ## Features
-- Assembly scanning for project code, plugins, UPM packages, known SDKs, and Unity modules
-- Grouped tree view with assembly, namespace, and type selection
+- Assembly scanning for project code, plugins, precompiled DLLs, UPM packages, known SDKs, and Unity modules (precompiled assemblies filtered to those included in the player build)
+- Grouped, hierarchical tree view with assembly, namespace, and type selection
 - Search by assembly, namespace, or type name
 - `link.xml` generation to `Assets/link.xml`
+- Namespace-level preservation: a fully selected namespace is written as a single `<namespace fullname="..." preserve="all"/>` entry; import and merge understand `<namespace>` elements and `namespace.*` wildcard patterns
 - Optional preview of generated XML before writing
 - Save and load selection profiles
 - Import the current `Assets/link.xml` when the window opens (legacy method-level entries are promoted to whole-type `preserve="all"` with a warning in the Console)
@@ -66,14 +68,13 @@ For example `https://github.com/DanilChizhikov/link-guard.git#v1.0.0`.
 - Preserve unknown entries and custom XML attributes when importing or merging
 - `ignoreIfMissing` support for assembly entries
 - Custom SDK grouping through `IKnownSdkProvider`
-- ProGuard/R8 keep-rule generation from scanned Android artifacts (`.aar`, `.androidlib`, `.jar`, Java/Kotlin sources)
+- ProGuard/R8 keep-rule generation from scanned Android artifacts (`.aar`, `.androidlib`, `.jar`, Java/Kotlin sources) across `Assets`, `Packages`, and registered UPM packages, filtered to artifacts included in the Android build
 - Modular tabs discovered through `IGeneratorTab` / `TypeCache`
 
 ## Usage
 
 ### Open the Window
-Open `Window/DTech/Link Guard` (the legacy `Window/DTech/Link XML Generator` menu opens the same window).
-The window hosts two tabs: **link.xml** and **ProGuard**.
+Open `Window/DTech/Link Guard`. The window hosts two tabs: **link.xml** and **ProGuard**.
 
 On the `link.xml` tab, press `Refresh` to scan assemblies. The tree is grouped by source:
 
@@ -86,7 +87,7 @@ On the `link.xml` tab, press `Refresh` to scan assemblies. The tree is grouped b
 
 ### Generate link.xml
 1. Use the search field to find assemblies, namespaces, or types.
-2. Select the entries that must be preserved. The smallest selectable unit is a type — once selected, the type is written with `preserve="all"`.
+2. Select the entries that must be preserved. The smallest selectable unit is a type (written with `preserve="all"`); selecting a whole namespace collapses to a single `<namespace preserve="all"/>` entry.
 3. Use `Select All` or `None` for quick bulk selection when needed.
 4. Press `Generate link.xml`.
 
