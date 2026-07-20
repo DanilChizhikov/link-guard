@@ -41,7 +41,9 @@ namespace DTech.LinkGuard.Editor
         {
             XElement assembly = new XElement("assembly", new XAttribute("fullname", entry.Name));
 
-            if (entry.IsAssemblySelected)
+            bool wholeAssembly = entry.IsAssemblySelected;
+
+            if (wholeAssembly)
             {
                 assembly.Add(new XAttribute("preserve", "all"));
             }
@@ -53,15 +55,40 @@ namespace DTech.LinkGuard.Editor
 
             LinkXmlPreservation.ApplyToAssembly(assembly, entry);
 
-            if (!entry.IsAssemblySelected)
+            if (!wholeAssembly)
             {
-                foreach (TypeEntry type in entry.Types.Where(t => t.ProducesEntry).OrderBy(t => t.LinkerFullname))
+                foreach (NamespaceEntry ns in entry.Namespaces.Where(n => n.ProducesEntry).OrderBy(n => n.Fullname))
                 {
-                    assembly.Add(BuildTypeElement(type));
+                    if (CanCollapse(ns))
+                    {
+                        assembly.Add(BuildNamespaceElement(ns));
+                        continue;
+                    }
+
+                    foreach (TypeEntry type in ns.Types.Where(t => t.ProducesEntry).OrderBy(t => t.LinkerFullname))
+                    {
+                        assembly.Add(BuildTypeElement(type));
+                    }
                 }
             }
 
             return assembly;
+        }
+
+        private static bool CanCollapse(NamespaceEntry ns)
+        {
+            return !string.IsNullOrEmpty(ns.Fullname)
+                && ns.Types.Count > 0
+                && ns.Types.All(t => t.IsSelected)
+                && ns.Types.All(t => t.LinkXmlAttributes.Count == 0 && t.LinkXmlChildren.Count == 0);
+        }
+
+        private static XElement BuildNamespaceElement(NamespaceEntry ns)
+        {
+            return new XElement(
+                "namespace",
+                new XAttribute("fullname", ns.Fullname),
+                new XAttribute("preserve", "all"));
         }
 
         private static XElement BuildTypeElement(TypeEntry type)

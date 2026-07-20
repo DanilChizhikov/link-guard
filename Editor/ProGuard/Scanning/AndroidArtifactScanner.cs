@@ -2,28 +2,33 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
+using UnityEditor;
 using UnityEngine;
+using PackageInfo = UnityEditor.PackageManager.PackageInfo;
+using PackageSource = UnityEditor.PackageManager.PackageSource;
 
 namespace DTech.LinkGuard.Editor.ProGuard
 {
     internal static class AndroidArtifactScanner
     {
-        private static readonly Regex PackageRegex =
-            new Regex(@"(?m)^\s*package\s+([A-Za-z_][\w.]*)", RegexOptions.Compiled);
+        internal readonly struct SearchRoot
+        {
+            public readonly string FullPath;
+            public readonly string OriginPrefix;
 
-        private static readonly Regex TypeRegex =
-            new Regex(@"\b(?:class|interface|enum|object)\s+([A-Za-z_]\w*)", RegexOptions.Compiled);
+            public SearchRoot(string fullPath, string originPrefix)
+            {
+                FullPath = fullPath;
+                OriginPrefix = originPrefix;
+            }
+        }
 
         public static List<AndroidArtifactEntry> Scan(Action<string, float> reportProgress = null)
         {
             string root = Normalize(Directory.GetCurrentDirectory());
+            List<SearchRoot> roots = CollectSearchRoots(root);
 
-            List<string> searchRoots = new[] { "Assets", "Packages" }
-                .Select(d => Path.Combine(root, d))
-                .Where(Directory.Exists)
-                .ToList();
-
+            List<string> searchRoots = roots.Select(r => r.FullPath).ToList();
             List<AndroidArtifactEntry> result = new List<AndroidArtifactEntry>();
 
             if (searchRoots.Count == 0)
@@ -76,7 +81,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
                 result.Add(new AndroidArtifactEntry(
                     Path.GetFileName(lib),
                     AndroidArtifactSource.AndroidLib,
-                    ToProjectRelative(lib, root),
+                    ResolveStableOrigin(lib, roots, root),
                     classes));
             }
 
@@ -84,7 +89,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
 
             foreach (string aar in aarFiles)
             {
-                if (IsUnderLib(aar))
+                if (IsUnderLib(aar) || !IsIncludedInAndroidBuild(aar, roots, root))
                 {
                     continue;
                 }
@@ -100,7 +105,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
                 result.Add(new AndroidArtifactEntry(
                     Path.GetFileName(aar),
                     AndroidArtifactSource.Aar,
-                    ToProjectRelative(aar, root),
+                    ResolveStableOrigin(aar, roots, root),
                     classes));
             }
 
@@ -108,7 +113,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
 
             foreach (string jar in jarFiles)
             {
-                if (IsUnderLib(jar))
+                if (IsUnderLib(jar) || !IsIncludedInAndroidBuild(jar, roots, root))
                 {
                     continue;
                 }
@@ -124,7 +129,7 @@ namespace DTech.LinkGuard.Editor.ProGuard
                 result.Add(new AndroidArtifactEntry(
                     Path.GetFileName(jar),
                     AndroidArtifactSource.Jar,
-                    ToProjectRelative(jar, root),
+                    ResolveStableOrigin(jar, roots, root),
                     classes));
             }
 
@@ -191,20 +196,12 @@ namespace DTech.LinkGuard.Editor.ProGuard
                     continue;
                 }
 
-                Match packageMatch = PackageRegex.Match(content);
-                string package = packageMatch.Success ? packageMatch.Groups[1].Value : string.Empty;
-
-                HashSet<string> typeNames = new HashSet<string>(StringComparer.Ordinal);
-
-                foreach (Match typeMatch in TypeRegex.Matches(content))
+                foreach (JavaSourceType sourceType in JavaSourceTypeExtractor.Extract(content, out string package))
                 {
-                    typeNames.Add(typeMatch.Groups[1].Value);
-                }
-
-                foreach (string typeName in typeNames)
-                {
-                    string fullname = string.IsNullOrEmpty(package) ? typeName : package + "." + typeName;
-                    classes.Add(new JavaClassEntry(package, fullname, typeName));
+                    string fullname = string.IsNullOrEmpty(package)
+                        ? sourceType.SimpleName
+                        : package + "." + sourceType.SimpleName;
+                    classes.Add(new JavaClassEntry(package, fullname, sourceType.SimpleName, sourceType.HasInnerClasses));
                 }
             }
         }
@@ -238,13 +235,96 @@ namespace DTech.LinkGuard.Editor.ProGuard
             return Normalize(path).IndexOf("/android", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
-        private static string ToProjectRelative(string path, string normalizedRoot)
+        private static bool IsIncludedInAndroidBuild(
+            string path, IReadOnlyList<SearchRoot> roots, string normalizedProjectRoot)
+        {
+            string assetPath = ResolveStableOrigin(path, roots, normalizedProjectRoot);
+            PluginImporter importer = AssetImporter.GetAtPath(assetPath) as PluginImporter;
+
+            if (importer == null)
+            {
+                return true;
+            }
+
+            return importer.GetCompatibleWithAnyPlatform()
+                || importer.GetCompatibleWithPlatform(BuildTarget.Android);
+        }
+
+        private static List<SearchRoot> CollectSearchRoots(string normalizedProjectRoot)
+        {
+            List<SearchRoot> roots = new List<SearchRoot>();
+
+            foreach (string folder in new[] { "Assets", "Packages" })
+            {
+                string fullPath = normalizedProjectRoot + "/" + folder;
+
+                if (Directory.Exists(fullPath))
+                {
+                    roots.Add(new SearchRoot(fullPath, folder));
+                }
+            }
+
+            string embeddedPrefix = normalizedProjectRoot + "/Packages/";
+
+            try
+            {
+                foreach (PackageInfo package in PackageInfo.GetAllRegisteredPackages())
+                {
+                    if (package == null
+                        || package.source == PackageSource.BuiltIn
+                        || string.IsNullOrEmpty(package.resolvedPath)
+                        || string.IsNullOrEmpty(package.name))
+                    {
+                        continue;
+                    }
+
+                    string resolved = Normalize(package.resolvedPath);
+
+                    if (resolved.StartsWith(embeddedPrefix, StringComparison.OrdinalIgnoreCase)
+                        || !Directory.Exists(resolved))
+                    {
+                        continue;
+                    }
+
+                    roots.Add(new SearchRoot(resolved, "Packages/" + package.name));
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[LinkGuard] [proguard] Failed to collect registered packages: {ex.Message}");
+            }
+
+            return roots;
+        }
+
+        internal static string ResolveStableOrigin(string path, IReadOnlyList<SearchRoot> roots, string normalizedProjectRoot)
         {
             string normalized = Normalize(path);
+            SearchRoot best = default;
+            bool found = false;
 
-            if (normalized.StartsWith(normalizedRoot + "/", StringComparison.OrdinalIgnoreCase))
+            foreach (SearchRoot candidate in roots)
             {
-                return normalized.Substring(normalizedRoot.Length + 1);
+                if (!normalized.StartsWith(candidate.FullPath + "/", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (!found || candidate.FullPath.Length > best.FullPath.Length)
+                {
+                    best = candidate;
+                    found = true;
+                }
+            }
+
+            if (found)
+            {
+                return best.OriginPrefix + normalized.Substring(best.FullPath.Length);
+            }
+
+            if (normalized.StartsWith(normalizedProjectRoot + "/", StringComparison.OrdinalIgnoreCase))
+            {
+                return normalized.Substring(normalizedProjectRoot.Length + 1);
             }
 
             return normalized;

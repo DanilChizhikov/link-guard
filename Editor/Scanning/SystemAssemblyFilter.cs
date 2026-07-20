@@ -6,7 +6,7 @@ namespace DTech.LinkGuard.Editor
     {
         private static readonly string[] _excludedPrefixes =
         {
-            "System",
+            "System.",
             "mscorlib",
             "netstandard",
             "Mono.",
@@ -30,6 +30,7 @@ namespace DTech.LinkGuard.Editor
 
         private static readonly string[] _excludedNames =
         {
+            "System",
             "Bee.BeeDriver",
             "ExCSS.Unity",
             "PsdPlugin",

@@ -50,6 +50,9 @@ namespace DTech.LinkGuard.Editor
 
             result.AddRange(DisabledAssemblyScanner.Scan(compiledNames, sourceResolver, reportProgress));
 
+            HashSet<string> knownNames = new HashSet<string>(result.Select(e => e.Name), StringComparer.Ordinal);
+            result.AddRange(PrecompiledAssemblyScanner.Scan(knownNames, sourceResolver, loadedByName, reportProgress));
+
             result.Sort((a, b) =>
             {
                 int cmp = ((int)a.Source).CompareTo((int)b.Source);

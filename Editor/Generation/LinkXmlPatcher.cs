@@ -6,8 +6,21 @@ using UnityEngine;
 
 namespace DTech.LinkGuard.Editor
 {
+    /// <summary>
+    /// Runs every discovered <see cref="ILinkXmlMergeProvider"/>, merges their output,
+    /// and writes the combined link.xml to <c>Assets/link.xml</c>. Intended as a
+    /// build-time entry point.
+    /// </summary>
     public static class LinkXmlPatcher
     {
+        /// <summary>
+        /// Runs all discovered merge providers and writes the merged link.xml to the default path.
+        /// </summary>
+        /// <param name="throwOnError">
+        /// When <c>true</c>, throws <see cref="UnityEditor.Build.BuildFailedException"/> if any
+        /// provider fails; when <c>false</c>, failures are captured in the returned report.
+        /// </param>
+        /// <returns>A report of the written file and each provider's outcome.</returns>
         public static LinkXmlPatchReport Patch(bool throwOnError = false)
         {
             return Patch(LinkXmlMergeProviderRegistry.Discover(), LinkXmlWriter.DefaultPath, throwOnError);

@@ -80,9 +80,17 @@ namespace DTech.LinkGuard.Editor.Tests
         }
 
         [Test]
-        public void ResolveType_NonexistentType_Missing()
+        public void ResolveType_NonexistentType_InScriptAssembly_Unknown()
         {
             BuildPresence presence = _oracle.ResolveType(EditorAssembly, "DTech.LinkGuard.Editor.NoSuchType123");
+
+            Assert.That(presence, Is.EqualTo(BuildPresence.Unknown));
+        }
+
+        [Test]
+        public void ResolveType_NonexistentType_InPrecompiledAssembly_Missing()
+        {
+            BuildPresence presence = _oracle.ResolveType("mscorlib", "System.NoSuchType123");
 
             Assert.That(presence, Is.EqualTo(BuildPresence.Missing));
         }

@@ -1,5 +1,6 @@
 #if LINKGUARD_ZENJECT_ENABLED
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Xml.Linq;
 using UnityEditor;
@@ -7,8 +8,14 @@ using UnityEngine;
 
 namespace DTech.LinkGuard.Editor.Zenject
 {
+    /// <summary>
+    /// Discovers reachable Zenject installers and their bound types, then merges the
+    /// corresponding entries into an existing link.xml. Aborts without writing if the
+    /// existing file is malformed. Intended as a build-time entry point.
+    /// </summary>
     public static class ZenjectLinkXmlPatcher
     {
+        /// <summary>Default link.xml path (<c>Assets/link.xml</c>) used when none is supplied.</summary>
         public const string DefaultPath = "Assets/link.xml";
 
         private const string LinkerElement = "linker";
@@ -17,12 +24,35 @@ namespace DTech.LinkGuard.Editor.Zenject
         private const string FullnameAttribute = "fullname";
         private const string PreserveAttribute = "preserve";
 
+        /// <summary>
+        /// Merges Zenject-reachable type entries into the link.xml at the given path.
+        /// </summary>
+        /// <param name="linkXmlPath">
+        /// Target link.xml path; falls back to <see cref="DefaultPath"/> when null or empty.
+        /// </param>
+        /// <returns>A report of added and already-covered types and the installer graph size.</returns>
         public static ZenjectPatchReport Patch(string linkXmlPath = DefaultPath)
         {
             string normalizedPath = string.IsNullOrEmpty(linkXmlPath) ? DefaultPath : linkXmlPath;
             ZenjectScanResult scan = ZenjectMergeProvider.Run();
 
-            XDocument document = LoadOrCreateDocument(normalizedPath);
+            XDocument document = LoadOrCreateDocument(normalizedPath, out string loadFailure);
+
+            if (document == null)
+            {
+                string reason = $"Existing link.xml at {normalizedPath} could not be used: {loadFailure}. Nothing written.";
+                Debug.LogError($"[LinkXmlGenerator] [zenject] {reason}");
+
+                List<string> warnings = new List<string>(scan.Warnings) { reason };
+                return new ZenjectPatchReport(
+                    normalizedPath,
+                    0,
+                    0,
+                    scan.ReachableInstallerCount,
+                    scan.IgnoredInstallerCount,
+                    warnings);
+            }
+
             XElement linker = document.Root;
 
             int added = 0;
@@ -95,8 +125,10 @@ namespace DTech.LinkGuard.Editor.Zenject
                 scan.Warnings);
         }
 
-        private static XDocument LoadOrCreateDocument(string path)
+        private static XDocument LoadOrCreateDocument(string path, out string failureReason)
         {
+            failureReason = string.Empty;
+
             if (!File.Exists(path))
             {
                 return new XDocument(new XElement(LinkerElement));
@@ -108,16 +140,16 @@ namespace DTech.LinkGuard.Editor.Zenject
                 if (document.Root == null
                     || !string.Equals(document.Root.Name.LocalName, LinkerElement, StringComparison.Ordinal))
                 {
-                    return new XDocument(new XElement(LinkerElement));
+                    failureReason = "root element is not <linker>";
+                    return null;
                 }
 
                 return document;
             }
             catch (Exception ex)
             {
-                Debug.LogWarning(
-                    $"[LinkXmlGenerator] [zenject] failed to load existing link.xml at {path}: {ex.Message}. Creating fresh document.");
-                return new XDocument(new XElement(LinkerElement));
+                failureReason = ex.Message;
+                return null;
             }
         }
 

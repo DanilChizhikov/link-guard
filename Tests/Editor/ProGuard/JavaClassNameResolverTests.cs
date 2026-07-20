@@ -5,6 +5,16 @@ namespace DTech.LinkGuard.Editor.ProGuard.Tests
     [TestFixture]
     internal sealed class JavaClassNameResolverTests
     {
+        [TestCase("META-INF/versions/9/com/foo/Bar.class")]
+        [TestCase("META-INF/services/Whatever.class")]
+        [TestCase("meta-inf/versions/11/com/foo/Bar.class")]
+        public void TryResolveClassEntry_MetaInfEntries_ReturnsFalse(string entryPath)
+        {
+            bool ok = JavaClassNameResolver.TryResolveClassEntry(entryPath, out _);
+
+            Assert.That(ok, Is.False);
+        }
+
         [Test]
         public void TryResolveClassEntry_TopLevelClass_ResolvesFullnameAndPackage()
         {
