@@ -1,0 +1,16 @@
+using System;
+using System.Collections.Generic;
+
+namespace DTech.LinkGuard.Editor.ProGuard
+{
+    [Serializable]
+    internal sealed class ProGuardSelection
+    {
+        public string Artifact;
+        public AndroidArtifactSource Source;
+        public string OriginPath;
+        public bool KeepAll;
+        public List<string> Packages = new();
+        public List<string> Classes = new();
+    }
+}

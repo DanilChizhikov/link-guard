@@ -18,11 +18,4 @@ namespace DTech.LinkGuard.Editor
         // v2 entries here are promoted to whole-type selection at load time.
         public List<LinkXmlMethodSelection> Methods = new();
     }
-
-    [Serializable]
-    internal sealed class LinkXmlMethodSelection
-    {
-        public string Type;
-        public string Signature;
-    }
 }

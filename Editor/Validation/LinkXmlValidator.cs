@@ -5,8 +5,21 @@ using UnityEngine;
 
 namespace DTech.LinkGuard.Editor
 {
+    /// <summary>
+    /// Validates the project's link.xml against the current build, removing entries for
+    /// assemblies and types no longer included. Intended as a build-time entry point.
+    /// </summary>
     public static class LinkXmlValidator
     {
+        /// <summary>
+        /// Validates the link.xml at the default path against the current build.
+        /// </summary>
+        /// <param name="apply">When <c>true</c>, writes the corrected link.xml back to disk.</param>
+        /// <param name="throwOnError">
+        /// When <c>true</c>, throws <see cref="UnityEditor.Build.BuildFailedException"/> on a
+        /// validation failure; when <c>false</c>, the failure is captured in the returned report.
+        /// </param>
+        /// <returns>A report of what was removed, kept, or flagged.</returns>
         public static LinkXmlValidationReport Validate(bool apply = true, bool throwOnError = false)
         {
             return Validate(new PlayerBuildMembershipOracle(), LinkXmlWriter.DefaultPath, apply, throwOnError);

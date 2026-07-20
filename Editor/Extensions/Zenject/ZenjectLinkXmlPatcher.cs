@@ -8,8 +8,14 @@ using UnityEngine;
 
 namespace DTech.LinkGuard.Editor.Zenject
 {
+    /// <summary>
+    /// Discovers reachable Zenject installers and their bound types, then merges the
+    /// corresponding entries into an existing link.xml. Aborts without writing if the
+    /// existing file is malformed. Intended as a build-time entry point.
+    /// </summary>
     public static class ZenjectLinkXmlPatcher
     {
+        /// <summary>Default link.xml path (<c>Assets/link.xml</c>) used when none is supplied.</summary>
         public const string DefaultPath = "Assets/link.xml";
 
         private const string LinkerElement = "linker";
@@ -18,6 +24,13 @@ namespace DTech.LinkGuard.Editor.Zenject
         private const string FullnameAttribute = "fullname";
         private const string PreserveAttribute = "preserve";
 
+        /// <summary>
+        /// Merges Zenject-reachable type entries into the link.xml at the given path.
+        /// </summary>
+        /// <param name="linkXmlPath">
+        /// Target link.xml path; falls back to <see cref="DefaultPath"/> when null or empty.
+        /// </param>
+        /// <returns>A report of added and already-covered types and the installer graph size.</returns>
         public static ZenjectPatchReport Patch(string linkXmlPath = DefaultPath)
         {
             string normalizedPath = string.IsNullOrEmpty(linkXmlPath) ? DefaultPath : linkXmlPath;
