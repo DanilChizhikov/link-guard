@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.0] - 2026-07-23
+
+### Added
+- link.xml sync: a **Sync** toolbar button and the public build-time API `DTech.LinkGuard.Editor.LinkXmlSync.Sync(apply, throwOnError)` that add entries for project code the current `Assets/link.xml` does not cover yet, so types written after the file was generated are not stripped. Sync only adds — existing entries, attributes, comments, and formatting are never removed, narrowed, or reordered
+- Sync covers every namespace of every project assembly, including assemblies missing from `link.xml` entirely: they are added as `<assembly fullname="..."/>` with one collapsed `<namespace fullname="..." preserve="all"/>` entry per namespace. Namespaces with deliberately narrowed entries (`preserve="fields"`, `preserve="methods"`) get explicit `<type preserve="all"/>` entries for the missing types instead, and the global namespace always uses explicit type entries
+- Sync is limited to project code (asmdefs under `Assets`) by default. Plugins, UPM packages, SDKs, and Unity assemblies are never expanded on their own, so a hand-written entry for a third-party SDK cannot silently grow the build; opt in with `LinkXmlSync.Sync(..., includeExternalAssemblies: true)` or cover them explicitly with scope patterns
+- Duplicate `<assembly fullname="...">` elements are aggregated: `preserve="all"` on any of them wins, an assembly counts as narrowed only when every duplicate is narrowed, and new entries are never appended to a narrowed element
+- An `<assembly>` element with an explicit `preserve` other than `all` and no children opts that assembly out of sync; such assemblies are listed in `LinkXmlSyncReport.SkippedAssemblies`
+- Optional glob scope patterns (`LinkXmlSync.Sync(new[] { "Game.*" }, ...)`) matched against assembly and namespace names; a pattern is an explicit opt-in and also covers non-project assemblies
+- `LinkXmlSyncReport` lists added assemblies, namespaces, and types grouped by assembly, plus the skipped assemblies
+
+
 ## [1.3.1] - 2026-07-20
 
 ### Fixed
