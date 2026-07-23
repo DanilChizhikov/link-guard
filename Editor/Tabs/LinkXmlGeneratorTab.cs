@@ -390,12 +390,12 @@ namespace DTech.LinkGuard.Editor
 
             if (!report.Changed)
             {
-                string message = "link.xml already covers every tracked namespace. Nothing to add.";
+                string message = "link.xml already covers every project namespace. Nothing to add.";
 
-                if (report.UntrackedAssemblies.Count > 0)
+                if (report.SkippedAssemblies.Count > 0)
                 {
-                    message += $"\n\n{report.UntrackedAssemblies.Count} project assemblies are not listed in "
-                        + "link.xml at all and were left untouched (see Console).";
+                    message += $"\n\n{report.SkippedAssemblies.Count} assemblies are explicitly narrowed in "
+                        + "link.xml and were skipped (see Console).";
                 }
 
                 EditorUtility.DisplayDialog(Title, message, "OK");
@@ -424,7 +424,7 @@ namespace DTech.LinkGuard.Editor
             if (report.AddedAssemblies.Count > 0)
             {
                 builder.AppendLine();
-                builder.AppendLine($"Assemblies to preserve ({report.AddedAssemblies.Count}):");
+                builder.AppendLine($"Assemblies to add ({report.AddedAssemblies.Count}):");
 
                 foreach (string assembly in report.AddedAssemblies)
                 {
@@ -486,12 +486,12 @@ namespace DTech.LinkGuard.Editor
                 builder.AppendLine($"  ... and {omitted} more (see Console).");
             }
 
-            if (report.UntrackedAssemblies.Count > 0)
+            if (report.SkippedAssemblies.Count > 0)
             {
                 builder.AppendLine();
                 builder.AppendLine(
-                    $"{report.UntrackedAssemblies.Count} project assemblies are not listed in link.xml at all "
-                    + "and are left untouched (see Console).");
+                    $"{report.SkippedAssemblies.Count} assemblies are explicitly narrowed in link.xml "
+                    + "and are skipped (see Console).");
             }
 
             builder.AppendLine();

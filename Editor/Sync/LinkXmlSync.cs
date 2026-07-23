@@ -9,8 +9,9 @@ namespace DTech.LinkGuard.Editor
     /// <summary>
     /// Keeps an existing link.xml in sync with the code that is actually in the project: types
     /// added after the file was generated are covered again, so new features are not stripped.
-    /// Entries are only added — nothing is removed, reordered, or narrowed. Intended as a
-    /// build-time entry point.
+    /// Every namespace of every project assembly is covered, including assemblies the file does not
+    /// mention yet. Entries are only added — nothing is removed, reordered, or narrowed. Intended
+    /// as a build-time entry point.
     /// </summary>
     public static class LinkXmlSync
     {
@@ -23,10 +24,18 @@ namespace DTech.LinkGuard.Editor
         /// existing link.xml cannot be read or parsed; when <c>false</c>, the failure is captured
         /// in the returned report.
         /// </param>
-        /// <returns>A report of what was added and what is still untracked.</returns>
-        public static LinkXmlSyncReport Sync(bool apply = true, bool throwOnError = false)
+        /// <param name="includeExternalAssemblies">
+        /// When <c>true</c>, assemblies that are not project code (plugins, UPM packages, SDKs,
+        /// Unity assemblies) are synchronized as well. Off by default, so a single hand-written
+        /// entry for a third-party SDK is never expanded into namespace-wide preservation.
+        /// </param>
+        /// <returns>A report of what was added and which assemblies were skipped.</returns>
+        public static LinkXmlSyncReport Sync(
+            bool apply = true,
+            bool throwOnError = false,
+            bool includeExternalAssemblies = false)
         {
-            return Sync(null, apply, throwOnError);
+            return Sync(null, apply, throwOnError, includeExternalAssemblies);
         }
 
         /// <summary>
@@ -35,21 +44,33 @@ namespace DTech.LinkGuard.Editor
         /// </summary>
         /// <param name="scopePatterns">
         /// Glob patterns (<c>*</c> and <c>?</c> wildcards) matched against assembly names and
-        /// namespace names, for example <c>Game.*</c>. Use them to cover assemblies that link.xml
-        /// does not mention at all yet.
+        /// namespace names, for example <c>Game.*</c>. A pattern is an explicit opt-in and also
+        /// applies to non-project assemblies, whatever <paramref name="includeExternalAssemblies"/>
+        /// says. A pattern matching an assembly name preserves that whole assembly.
         /// </param>
         /// <param name="apply">When <c>true</c>, writes the extended link.xml back to disk.</param>
         /// <param name="throwOnError">
         /// When <c>true</c>, throws <see cref="UnityEditor.Build.BuildFailedException"/> on a
         /// read or parse failure.
         /// </param>
-        /// <returns>A report of what was added and what is still untracked.</returns>
+        /// <param name="includeExternalAssemblies">
+        /// When <c>true</c>, assemblies that are not project code (plugins, UPM packages, SDKs,
+        /// Unity assemblies) are synchronized as well.
+        /// </param>
+        /// <returns>A report of what was added and which assemblies were skipped.</returns>
         public static LinkXmlSyncReport Sync(
             IReadOnlyList<string> scopePatterns,
             bool apply = true,
-            bool throwOnError = false)
+            bool throwOnError = false,
+            bool includeExternalAssemblies = false)
         {
-            return Sync(ScannedProjectTypeSource.Create(), LinkXmlWriter.DefaultPath, scopePatterns, apply, throwOnError);
+            return Sync(
+                ScannedProjectTypeSource.Create(),
+                LinkXmlWriter.DefaultPath,
+                scopePatterns,
+                apply,
+                throwOnError,
+                includeExternalAssemblies);
         }
 
         internal static LinkXmlSyncReport Sync(
@@ -57,7 +78,8 @@ namespace DTech.LinkGuard.Editor
             string path,
             IReadOnlyList<string> scopePatterns,
             bool apply,
-            bool throwOnError)
+            bool throwOnError,
+            bool includeExternalAssemblies = false)
         {
             string normalized = string.IsNullOrEmpty(path) ? LinkXmlWriter.DefaultPath : path;
 
@@ -76,7 +98,7 @@ namespace DTech.LinkGuard.Editor
                     addedAssemblies: null,
                     addedNamespaces: null,
                     addedTypes: null,
-                    untrackedAssemblies: null);
+                    skippedAssemblies: null);
             }
 
             string xml;
@@ -90,7 +112,8 @@ namespace DTech.LinkGuard.Editor
                 return Fail(normalized, $"Failed to read link.xml at {normalized}: {ex.Message}", throwOnError);
             }
 
-            LinkXmlSyncOutcome outcome = LinkXmlSyncEngine.Sync(xml, source, scopePatterns);
+            LinkXmlSyncOutcome outcome =
+                LinkXmlSyncEngine.Sync(xml, source, scopePatterns, includeExternalAssemblies);
 
             if (!outcome.Success)
             {
@@ -116,7 +139,7 @@ namespace DTech.LinkGuard.Editor
                 outcome.AddedAssemblies,
                 outcome.AddedNamespaces,
                 outcome.AddedTypes,
-                outcome.UntrackedAssemblies);
+                outcome.SkippedAssemblies);
 
             LogReport(report);
             return report;
@@ -152,7 +175,7 @@ namespace DTech.LinkGuard.Editor
                 addedAssemblies: null,
                 addedNamespaces: null,
                 addedTypes: null,
-                untrackedAssemblies: null);
+                skippedAssemblies: null);
         }
 
         private static void LogReport(LinkXmlSyncReport report)
@@ -180,10 +203,10 @@ namespace DTech.LinkGuard.Editor
                 }
             }
 
-            foreach (string assembly in report.UntrackedAssemblies)
+            foreach (string assembly in report.SkippedAssemblies)
             {
                 Debug.LogWarning(
-                    $"[LinkXmlGenerator] Untracked project assembly (not present in link.xml): {assembly}");
+                    $"[LinkXmlGenerator] Skipped explicitly narrowed assembly: {assembly}");
             }
         }
     }

@@ -7,9 +7,10 @@ using System.Xml.Linq;
 namespace DTech.LinkGuard.Editor
 {
     /// <summary>
-    /// Adds link.xml entries for project code that the file does not cover yet. The scope is
-    /// inferred from the file itself: a namespace that already has whole-type entries is treated
-    /// as tracked, so types added to it later must stay preserved. Nothing is ever removed,
+    /// Adds link.xml entries for project code that the file does not cover yet: every namespace of
+    /// every project assembly, including assemblies the file does not mention at all. Assemblies
+    /// that are explicitly narrowed on the <c>&lt;assembly&gt;</c> element itself are left alone,
+    /// and so are non-project assemblies unless they are opted in. Nothing is ever removed,
     /// rewritten, or narrowed.
     /// </summary>
     internal static class LinkXmlSyncEngine
@@ -31,7 +32,8 @@ namespace DTech.LinkGuard.Editor
         public static LinkXmlSyncOutcome Sync(
             string xml,
             IProjectTypeSource source,
-            IReadOnlyList<string> scopePatterns = null)
+            IReadOnlyList<string> scopePatterns = null,
+            bool includeExternalAssemblies = false)
         {
             if (source == null)
             {
@@ -56,11 +58,12 @@ namespace DTech.LinkGuard.Editor
 
             Dictionary<string, AssemblyCoverage> coverages = CollectCoverages(document.Root);
             SyncAdditions additions = new SyncAdditions();
+            List<string> skipped = new List<string>();
 
-            SyncTrackedNamespaces(source, coverages, additions);
+            // Explicit scope patterns run first: a pattern matching an assembly name creates a
+            // whole-assembly entry, which the project pass below then leaves alone.
             SyncScopePatterns(document.Root, source, coverages, scopePatterns, additions);
-
-            List<string> untracked = CollectUntrackedAssemblies(source, coverages);
+            SyncProjectAssemblies(document.Root, source, coverages, includeExternalAssemblies, additions, skipped);
 
             bool changed = additions.Any;
             string result = changed ? Serialize(document, xml) : xml;
@@ -71,7 +74,7 @@ namespace DTech.LinkGuard.Editor
                 additions.Assemblies,
                 additions.BuildNamespaceGroups(),
                 additions.BuildTypeGroups(),
-                untracked);
+                skipped);
         }
 
         private static Dictionary<string, AssemblyCoverage> CollectCoverages(XElement linker)
@@ -101,30 +104,52 @@ namespace DTech.LinkGuard.Editor
             return coverages;
         }
 
-        private static void SyncTrackedNamespaces(
+        private static void SyncProjectAssemblies(
+            XElement linker,
             IProjectTypeSource source,
             Dictionary<string, AssemblyCoverage> coverages,
-            SyncAdditions additions)
+            bool includeExternalAssemblies,
+            SyncAdditions additions,
+            List<string> skipped)
         {
-            foreach (AssemblyCoverage coverage in coverages.Values.ToList())
+            foreach (string assemblyName in source.AssemblyNames)
             {
-                if (coverage.PreservesWholeAssembly || coverage.IsExplicitlyNarrowed)
+                if (!includeExternalAssemblies && !source.IsProjectAssembly(assemblyName))
                 {
                     continue;
                 }
 
-                if (!source.TryGetNamespaces(coverage.Name, out IReadOnlyList<NamespaceEntry> namespaces))
+                if (!source.TryGetNamespaces(assemblyName, out IReadOnlyList<NamespaceEntry> namespaces))
                 {
+                    continue;
+                }
+
+                // An <assembly> element without children preserves everything, so an assembly with
+                // nothing to write must never get an entry.
+                if (!namespaces.Any(n => n.Types.Count > 0))
+                {
+                    continue;
+                }
+
+                if (!coverages.TryGetValue(assemblyName, out AssemblyCoverage coverage))
+                {
+                    coverage = CreateAssemblyEntry(linker, assemblyName, preserveWholeAssembly: false, additions);
+                    coverages.Add(assemblyName, coverage);
+                }
+
+                if (coverage.PreservesWholeAssembly)
+                {
+                    continue;
+                }
+
+                if (coverage.IsExplicitlyNarrowed)
+                {
+                    skipped.Add(assemblyName);
                     continue;
                 }
 
                 foreach (NamespaceEntry ns in namespaces)
                 {
-                    if (!coverage.IsTracked(ns.Fullname))
-                    {
-                        continue;
-                    }
-
                     EnsureNamespaceCovered(coverage, ns, additions, force: false);
                 }
             }
@@ -159,7 +184,7 @@ namespace DTech.LinkGuard.Editor
                         .Where(n => !string.IsNullOrEmpty(n.Fullname) && Matches(matchers, n.Fullname))
                         .ToList();
 
-                if (matched.Count == 0)
+                if (!matched.Any(n => n.Types.Count > 0))
                 {
                     continue;
                 }
@@ -201,15 +226,11 @@ namespace DTech.LinkGuard.Editor
             }
 
             AppendChild(linker, element);
-
-            if (!preserveWholeAssembly)
-            {
-                return AssemblyCoverage.Empty(assemblyName, element);
-            }
-
             additions.Assemblies.Add(assemblyName);
 
-            return AssemblyCoverage.WholeAssembly(assemblyName, element);
+            return preserveWholeAssembly
+                ? AssemblyCoverage.WholeAssembly(assemblyName, element)
+                : AssemblyCoverage.Empty(assemblyName, element);
         }
 
         private static void EnsureNamespaceCovered(
@@ -258,25 +279,6 @@ namespace DTech.LinkGuard.Editor
                 coverage.MarkTypeListed(typeName);
                 additions.AddType(coverage.Name, typeName);
             }
-        }
-
-        private static List<string> CollectUntrackedAssemblies(
-            IProjectTypeSource source,
-            Dictionary<string, AssemblyCoverage> coverages)
-        {
-            List<string> untracked = new List<string>();
-
-            foreach (string assemblyName in source.AssemblyNames)
-            {
-                if (coverages.ContainsKey(assemblyName) || !source.IsProjectAssembly(assemblyName))
-                {
-                    continue;
-                }
-
-                untracked.Add(assemblyName);
-            }
-
-            return untracked;
         }
 
         private static List<Regex> BuildMatchers(IReadOnlyList<string> scopePatterns)
@@ -488,37 +490,41 @@ namespace DTech.LinkGuard.Editor
             }
         }
 
+        /// <summary>
+        /// What a link.xml already preserves for one assembly name. A name may appear on several
+        /// <c>&lt;assembly&gt;</c> elements, so both the element attributes and the child entries of
+        /// every duplicate are aggregated: <c>preserve="all"</c> anywhere wins, and an assembly only
+        /// counts as narrowed when every duplicate is narrowed.
+        /// </summary>
         private sealed class AssemblyCoverage
         {
             private readonly HashSet<string> _coveredNamespaces = new HashSet<string>(StringComparer.Ordinal);
-            private readonly HashSet<string> _trackedNamespaces = new HashSet<string>(StringComparer.Ordinal);
             private readonly HashSet<string> _narrowedNamespaces = new HashSet<string>(StringComparer.Ordinal);
             private readonly HashSet<string> _listedTypes = new HashSet<string>(StringComparer.Ordinal);
 
-            public string Name { get; }
-            public XElement Element { get; }
-            public bool PreservesWholeAssembly { get; }
-            public bool IsExplicitlyNarrowed { get; }
+            private bool _preservesWholeAssembly;
+            private bool _allElementsNarrowed = true;
+            private bool _hasAbsorbedElement;
 
-            private AssemblyCoverage(
-                string name,
-                XElement element,
-                bool preservesWholeAssembly,
-                bool isExplicitlyNarrowed)
+            public string Name { get; }
+
+            /// <summary>The element new entries are appended to; never an explicitly narrowed duplicate.</summary>
+            public XElement Element { get; private set; }
+
+            public bool PreservesWholeAssembly => _preservesWholeAssembly;
+
+            public bool IsExplicitlyNarrowed =>
+                _hasAbsorbedElement && _allElementsNarrowed && !_preservesWholeAssembly;
+
+            private AssemblyCoverage(string name, XElement element)
             {
                 Name = name;
                 Element = element;
-                PreservesWholeAssembly = preservesWholeAssembly;
-                IsExplicitlyNarrowed = isExplicitlyNarrowed;
             }
 
             public static AssemblyCoverage FromElement(string name, XElement element)
             {
-                AssemblyCoverage coverage = new AssemblyCoverage(
-                    name,
-                    element,
-                    AssemblyPreservesAll(element),
-                    AssemblyIsExplicitlyNarrowed(element));
+                AssemblyCoverage coverage = new AssemblyCoverage(name, element);
 
                 coverage.Absorb(element);
 
@@ -527,16 +533,35 @@ namespace DTech.LinkGuard.Editor
 
             public static AssemblyCoverage Empty(string name, XElement element)
             {
-                return new AssemblyCoverage(name, element, false, false);
+                return new AssemblyCoverage(name, element);
             }
 
             public static AssemblyCoverage WholeAssembly(string name, XElement element)
             {
-                return new AssemblyCoverage(name, element, true, false);
+                return new AssemblyCoverage(name, element) { _preservesWholeAssembly = true };
             }
 
             public void Absorb(XElement element)
             {
+                bool narrowed = AssemblyIsExplicitlyNarrowed(element);
+
+                if (AssemblyPreservesAll(element))
+                {
+                    _preservesWholeAssembly = true;
+                }
+
+                if (!narrowed)
+                {
+                    if (!_hasAbsorbedElement || _allElementsNarrowed)
+                    {
+                        Element = element;
+                    }
+
+                    _allElementsNarrowed = false;
+                }
+
+                _hasAbsorbedElement = true;
+
                 foreach (XElement child in element.Elements())
                 {
                     string localName = child.Name.LocalName;
@@ -557,11 +582,6 @@ namespace DTech.LinkGuard.Editor
             public bool IsCovered(string namespaceName)
             {
                 return _coveredNamespaces.Contains(namespaceName ?? string.Empty);
-            }
-
-            public bool IsTracked(string namespaceName)
-            {
-                return _trackedNamespaces.Contains(namespaceName ?? string.Empty);
             }
 
             public bool HasNarrowedTypes(string namespaceName)
@@ -623,15 +643,11 @@ namespace DTech.LinkGuard.Editor
                 }
 
                 _listedTypes.Add(fullname);
-                string namespaceName = NamespaceOf(fullname);
 
-                if (preservesEverything)
+                if (!preservesEverything)
                 {
-                    _trackedNamespaces.Add(namespaceName);
-                    return;
+                    _narrowedNamespaces.Add(NamespaceOf(fullname));
                 }
-
-                _narrowedNamespaces.Add(namespaceName);
             }
         }
     }

@@ -12,7 +12,7 @@ namespace DTech.LinkGuard.Editor
         public IReadOnlyList<string> AddedAssemblies { get; }
         public IReadOnlyList<LinkXmlSyncEntryGroup> AddedNamespaces { get; }
         public IReadOnlyList<LinkXmlSyncEntryGroup> AddedTypes { get; }
-        public IReadOnlyList<string> UntrackedAssemblies { get; }
+        public IReadOnlyList<string> SkippedAssemblies { get; }
 
         private LinkXmlSyncOutcome(
             bool success,
@@ -22,7 +22,7 @@ namespace DTech.LinkGuard.Editor
             IReadOnlyList<string> addedAssemblies,
             IReadOnlyList<LinkXmlSyncEntryGroup> addedNamespaces,
             IReadOnlyList<LinkXmlSyncEntryGroup> addedTypes,
-            IReadOnlyList<string> untrackedAssemblies)
+            IReadOnlyList<string> skippedAssemblies)
         {
             Success = success;
             FailureReason = failureReason ?? string.Empty;
@@ -31,7 +31,7 @@ namespace DTech.LinkGuard.Editor
             AddedAssemblies = addedAssemblies ?? Array.Empty<string>();
             AddedNamespaces = addedNamespaces ?? Array.Empty<LinkXmlSyncEntryGroup>();
             AddedTypes = addedTypes ?? Array.Empty<LinkXmlSyncEntryGroup>();
-            UntrackedAssemblies = untrackedAssemblies ?? Array.Empty<string>();
+            SkippedAssemblies = skippedAssemblies ?? Array.Empty<string>();
         }
 
         public static LinkXmlSyncOutcome Failed(string reason, string xml)
@@ -45,7 +45,7 @@ namespace DTech.LinkGuard.Editor
             IReadOnlyList<string> addedAssemblies,
             IReadOnlyList<LinkXmlSyncEntryGroup> addedNamespaces,
             IReadOnlyList<LinkXmlSyncEntryGroup> addedTypes,
-            IReadOnlyList<string> untrackedAssemblies)
+            IReadOnlyList<string> skippedAssemblies)
         {
             return new LinkXmlSyncOutcome(
                 true,
@@ -55,7 +55,7 @@ namespace DTech.LinkGuard.Editor
                 addedAssemblies,
                 addedNamespaces,
                 addedTypes,
-                untrackedAssemblies);
+                skippedAssemblies);
         }
     }
 }

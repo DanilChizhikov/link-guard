@@ -5,7 +5,7 @@ using System.Linq;
 namespace DTech.LinkGuard.Editor
 {
     /// <summary>
-    /// Outcome of a <see cref="LinkXmlSync.Sync(bool, bool)"/> run: which entries were added to an
+    /// Outcome of a <see cref="LinkXmlSync.Sync(bool, bool, bool)"/> run: which entries were added to an
     /// existing link.xml so that newly written code stays covered, and whether the file changed.
     /// Sync never removes or narrows existing entries.
     /// </summary>
@@ -32,7 +32,7 @@ namespace DTech.LinkGuard.Editor
         /// <summary>Whether the changed content was written back to disk.</summary>
         public bool Written { get; }
 
-        /// <summary>Assemblies added as whole-assembly <c>preserve="all"</c> entries by a scope pattern.</summary>
+        /// <summary>Assemblies that had no <c>&lt;assembly&gt;</c> entry at all and were added.</summary>
         public IReadOnlyList<string> AddedAssemblies { get; }
 
         /// <summary>Namespaces added as <c>preserve="all"</c> entries, grouped by owning assembly.</summary>
@@ -42,10 +42,11 @@ namespace DTech.LinkGuard.Editor
         public IReadOnlyList<LinkXmlSyncEntryGroup> AddedTypes { get; }
 
         /// <summary>
-        /// Project assemblies that link.xml does not mention at all. Reported only; nothing is
-        /// written for them because there is no existing entry to infer intent from.
+        /// Assemblies sync deliberately left alone because their <c>&lt;assembly&gt;</c> element is
+        /// explicitly narrowed (a <c>preserve</c> other than <c>all</c> and no child entries).
+        /// Reported only; nothing is written for them.
         /// </summary>
-        public IReadOnlyList<string> UntrackedAssemblies { get; }
+        public IReadOnlyList<string> SkippedAssemblies { get; }
 
         /// <summary>Total number of added namespace entries across all groups.</summary>
         public int AddedNamespaceCount => AddedNamespaces.Sum(g => g.Names.Count);
@@ -63,10 +64,10 @@ namespace DTech.LinkGuard.Editor
         /// <param name="fileExisted">Whether a link.xml existed to synchronize.</param>
         /// <param name="changed">Whether anything was added.</param>
         /// <param name="written">Whether the change was written back.</param>
-        /// <param name="addedAssemblies">Assemblies added by a scope pattern.</param>
+        /// <param name="addedAssemblies">Assemblies that were missing from link.xml and were added.</param>
         /// <param name="addedNamespaces">Namespaces added, grouped by assembly.</param>
         /// <param name="addedTypes">Types added, grouped by assembly.</param>
-        /// <param name="untrackedAssemblies">Project assemblies absent from link.xml.</param>
+        /// <param name="skippedAssemblies">Assemblies skipped because they are explicitly narrowed.</param>
         public LinkXmlSyncReport(
             string outputPath,
             string xml,
@@ -78,7 +79,7 @@ namespace DTech.LinkGuard.Editor
             IReadOnlyList<string> addedAssemblies,
             IReadOnlyList<LinkXmlSyncEntryGroup> addedNamespaces,
             IReadOnlyList<LinkXmlSyncEntryGroup> addedTypes,
-            IReadOnlyList<string> untrackedAssemblies)
+            IReadOnlyList<string> skippedAssemblies)
         {
             OutputPath = outputPath ?? string.Empty;
             Xml = xml ?? string.Empty;
@@ -90,7 +91,7 @@ namespace DTech.LinkGuard.Editor
             AddedAssemblies = addedAssemblies ?? Array.Empty<string>();
             AddedNamespaces = addedNamespaces ?? Array.Empty<LinkXmlSyncEntryGroup>();
             AddedTypes = addedTypes ?? Array.Empty<LinkXmlSyncEntryGroup>();
-            UntrackedAssemblies = untrackedAssemblies ?? Array.Empty<string>();
+            SkippedAssemblies = skippedAssemblies ?? Array.Empty<string>();
         }
 
         /// <summary>Returns a one-line summary of the sync outcome.</summary>
@@ -100,7 +101,7 @@ namespace DTech.LinkGuard.Editor
             return $"LinkXmlSyncReport[Path={OutputPath}, Success={Success}, "
                 + $"Changed={Changed}, Written={Written}, "
                 + $"AddedAssemblies={AddedAssemblies.Count}, AddedNamespaces={AddedNamespaceCount}, "
-                + $"AddedTypes={AddedTypeCount}, Untracked={UntrackedAssemblies.Count}]";
+                + $"AddedTypes={AddedTypeCount}, Skipped={SkippedAssemblies.Count}]";
         }
     }
 }

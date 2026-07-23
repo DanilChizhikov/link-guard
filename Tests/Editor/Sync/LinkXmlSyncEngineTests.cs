@@ -109,7 +109,7 @@ namespace DTech.LinkGuard.Editor.Tests
         }
 
         [Test]
-        public void Sync_NarrowPreserveOnly_NamespaceIsNotTracked()
+        public void Sync_NarrowPreserveOnly_AddsExplicitTypesWithoutCollapsing()
         {
             string xml =
                 "<linker>\n"
@@ -123,8 +123,11 @@ namespace DTech.LinkGuard.Editor.Tests
 
             LinkXmlSyncOutcome outcome = LinkXmlSyncEngine.Sync(xml, source);
 
-            Assert.That(outcome.Changed, Is.False);
-            Assert.That(outcome.Xml, Is.EqualTo(xml));
+            Assert.That(outcome.Changed, Is.True);
+            Assert.That(outcome.Xml, Does.Not.Contain("<namespace"));
+            Assert.That(outcome.Xml, Does.Contain("<type fullname=\"B.Foo\" preserve=\"fields\" />"));
+            Assert.That(outcome.Xml, Does.Contain("<type fullname=\"B.Bar\" preserve=\"all\" />"));
+            Assert.That(outcome.AddedTypes.Single().Names, Is.EqualTo(new[] { "B.Bar" }));
         }
 
         [Test]
@@ -200,12 +203,34 @@ namespace DTech.LinkGuard.Editor.Tests
                 + "</linker>\n";
 
             FakeProjectTypeSource source = new FakeProjectTypeSource()
-                .Assembly("B", "B.Foo");
+                .ExternalAssembly("B", "B.Foo");
 
             LinkXmlSyncOutcome outcome = LinkXmlSyncEngine.Sync(xml, source);
 
             Assert.That(outcome.Changed, Is.False);
             Assert.That(outcome.Xml, Is.EqualTo(xml));
+        }
+
+        [Test]
+        public void Sync_ScannedAssemblyMissingFromLinkXml_IsAddedWithoutTouchingUnknownEntry()
+        {
+            string xml =
+                "<linker>\n"
+                + "    <assembly fullname=\"Unknown\">\n"
+                + "        <type fullname=\"Unknown.Foo\" preserve=\"all\" />\n"
+                + "    </assembly>\n"
+                + "</linker>\n";
+
+            FakeProjectTypeSource source = new FakeProjectTypeSource()
+                .Assembly("B", "B.Foo");
+
+            LinkXmlSyncOutcome outcome = LinkXmlSyncEngine.Sync(xml, source);
+
+            Assert.That(outcome.Changed, Is.True);
+            Assert.That(outcome.Xml, Does.Contain("<type fullname=\"Unknown.Foo\" preserve=\"all\" />"));
+            Assert.That(outcome.Xml, Does.Contain("<assembly fullname=\"B\">"));
+            Assert.That(outcome.Xml, Does.Contain("<namespace fullname=\"B\" preserve=\"all\" />"));
+            Assert.That(outcome.AddedAssemblies, Is.EqualTo(new[] { "B" }));
         }
 
         [Test]
@@ -232,7 +257,7 @@ namespace DTech.LinkGuard.Editor.Tests
         }
 
         [Test]
-        public void Sync_UntrackedProjectAssembly_ReportedWithoutWriting()
+        public void Sync_ProjectAssemblyMissingFromLinkXml_IsAddedWithNamespaceEntries()
         {
             string xml =
                 "<linker>\n"
@@ -241,12 +266,115 @@ namespace DTech.LinkGuard.Editor.Tests
 
             FakeProjectTypeSource source = new FakeProjectTypeSource()
                 .Assembly("B", "B.Foo")
-                .ProjectAssembly("Game.NewFeature", "Game.NewFeature.Boot");
+                .ProjectAssembly("Game.NewFeature", "Game.NewFeature.Boot", "Game.NewFeature.Ui.Hud");
+
+            LinkXmlSyncOutcome outcome = LinkXmlSyncEngine.Sync(xml, source);
+
+            Assert.That(outcome.Changed, Is.True);
+            Assert.That(outcome.AddedAssemblies, Is.EqualTo(new[] { "Game.NewFeature" }));
+            Assert.That(outcome.Xml, Does.Contain("<assembly fullname=\"Game.NewFeature\">"));
+            Assert.That(outcome.Xml, Does.Contain("<namespace fullname=\"Game.NewFeature\" preserve=\"all\" />"));
+            Assert.That(outcome.Xml, Does.Contain("<namespace fullname=\"Game.NewFeature.Ui\" preserve=\"all\" />"));
+            Assert.That(outcome.Xml, Does.Contain("<assembly fullname=\"B\" preserve=\"all\" />"));
+            Assert.That(outcome.SkippedAssemblies, Is.Empty);
+        }
+
+        [Test]
+        public void Sync_NewNamespaceInTrackedAssembly_IsCovered()
+        {
+            string xml =
+                "<linker>\n"
+                + "    <assembly fullname=\"Game\">\n"
+                + "        <type fullname=\"Game.Boot\" preserve=\"all\" />\n"
+                + "    </assembly>\n"
+                + "</linker>\n";
+
+            FakeProjectTypeSource source = new FakeProjectTypeSource()
+                .Assembly("Game", "Game.Boot", "Game.Ui.Hud");
+
+            LinkXmlSyncOutcome outcome = LinkXmlSyncEngine.Sync(xml, source);
+
+            Assert.That(outcome.Changed, Is.True);
+            Assert.That(outcome.Xml, Does.Contain("<namespace fullname=\"Game.Ui\" preserve=\"all\" />"));
+            Assert.That(outcome.AddedAssemblies, Is.Empty);
+        }
+
+        [Test]
+        public void Sync_ExplicitlyNarrowedAssembly_IsSkippedAndReported()
+        {
+            string xml =
+                "<linker>\n"
+                + "    <assembly fullname=\"Game.Debug\" preserve=\"nothing\" />\n"
+                + "</linker>\n";
+
+            FakeProjectTypeSource source = new FakeProjectTypeSource()
+                .Assembly("Game.Debug", "Game.Debug.Console");
 
             LinkXmlSyncOutcome outcome = LinkXmlSyncEngine.Sync(xml, source);
 
             Assert.That(outcome.Changed, Is.False);
-            Assert.That(outcome.UntrackedAssemblies, Is.EqualTo(new[] { "Game.NewFeature" }));
+            Assert.That(outcome.Xml, Is.EqualTo(xml));
+            Assert.That(outcome.SkippedAssemblies, Is.EqualTo(new[] { "Game.Debug" }));
+        }
+
+        [Test]
+        public void Sync_ExternalAssembly_IsLeftUntouchedByDefault()
+        {
+            string xml =
+                "<linker>\n"
+                + "    <assembly fullname=\"Firebase.App\">\n"
+                + "        <type fullname=\"Firebase.FirebaseApp\" preserve=\"all\" />\n"
+                + "    </assembly>\n"
+                + "</linker>\n";
+
+            FakeProjectTypeSource source = new FakeProjectTypeSource()
+                .ExternalAssembly("Firebase.App", "Firebase.FirebaseApp", "Firebase.FirebaseOptions");
+
+            LinkXmlSyncOutcome outcome = LinkXmlSyncEngine.Sync(xml, source);
+
+            Assert.That(outcome.Changed, Is.False);
+            Assert.That(outcome.Xml, Is.EqualTo(xml));
+        }
+
+        [Test]
+        public void Sync_ExternalAssembly_IsCoveredWhenIncluded()
+        {
+            string xml =
+                "<linker>\n"
+                + "    <assembly fullname=\"Firebase.App\">\n"
+                + "        <type fullname=\"Firebase.FirebaseApp\" preserve=\"all\" />\n"
+                + "    </assembly>\n"
+                + "</linker>\n";
+
+            FakeProjectTypeSource source = new FakeProjectTypeSource()
+                .ExternalAssembly("Firebase.App", "Firebase.FirebaseApp", "Firebase.FirebaseOptions");
+
+            LinkXmlSyncOutcome outcome = LinkXmlSyncEngine.Sync(
+                xml, source, scopePatterns: null, includeExternalAssemblies: true);
+
+            Assert.That(outcome.Changed, Is.True);
+            Assert.That(outcome.Xml, Does.Contain("<namespace fullname=\"Firebase\" preserve=\"all\" />"));
+        }
+
+        [Test]
+        public void Sync_ExternalAssemblyMatchedByScopePattern_IsCoveredWithoutFlag()
+        {
+            string xml =
+                "<linker>\n"
+                + "    <assembly fullname=\"Game\">\n"
+                + "        <type fullname=\"Game.Boot\" preserve=\"all\" />\n"
+                + "    </assembly>\n"
+                + "</linker>\n";
+
+            FakeProjectTypeSource source = new FakeProjectTypeSource()
+                .Assembly("Game", "Game.Boot")
+                .ExternalAssembly("Firebase.App", "Firebase.FirebaseApp");
+
+            LinkXmlSyncOutcome outcome = LinkXmlSyncEngine.Sync(xml, source, new[] { "Firebase.*" });
+
+            Assert.That(outcome.Changed, Is.True);
+            Assert.That(outcome.AddedAssemblies, Is.EqualTo(new[] { "Firebase.App" }));
+            Assert.That(outcome.Xml, Does.Contain("<assembly fullname=\"Firebase.App\" preserve=\"all\" />"));
         }
 
         [Test]
@@ -285,6 +413,112 @@ namespace DTech.LinkGuard.Editor.Tests
 
             Assert.That(outcome.Changed, Is.True);
             Assert.That(outcome.Xml, Does.Contain("<namespace fullname=\"B.Feature\" preserve=\"all\" />"));
+        }
+
+        [Test]
+        public void Sync_DuplicateAssembly_SecondPreservesAll_AddsNothing()
+        {
+            string xml =
+                "<linker>\n"
+                + "    <assembly fullname=\"B\">\n"
+                + "        <type fullname=\"B.Foo\" preserve=\"all\" />\n"
+                + "    </assembly>\n"
+                + "    <assembly fullname=\"B\" preserve=\"all\" />\n"
+                + "</linker>\n";
+
+            FakeProjectTypeSource source = new FakeProjectTypeSource()
+                .Assembly("B", "B.Foo", "B.Bar");
+
+            LinkXmlSyncOutcome outcome = LinkXmlSyncEngine.Sync(xml, source);
+
+            Assert.That(outcome.Changed, Is.False);
+            Assert.That(outcome.Xml, Is.EqualTo(xml));
+        }
+
+        [Test]
+        public void Sync_DuplicateAssembly_SecondHasNoChildren_AddsNothing()
+        {
+            string xml =
+                "<linker>\n"
+                + "    <assembly fullname=\"B\">\n"
+                + "        <type fullname=\"B.Foo\" preserve=\"all\" />\n"
+                + "    </assembly>\n"
+                + "    <assembly fullname=\"B\" />\n"
+                + "</linker>\n";
+
+            FakeProjectTypeSource source = new FakeProjectTypeSource()
+                .Assembly("B", "B.Foo", "B.Bar");
+
+            LinkXmlSyncOutcome outcome = LinkXmlSyncEngine.Sync(xml, source);
+
+            Assert.That(outcome.Changed, Is.False);
+            Assert.That(outcome.Xml, Is.EqualTo(xml));
+        }
+
+        [Test]
+        public void Sync_DuplicateAssembly_FirstNarrowed_SyncsIntoSecond()
+        {
+            string xml =
+                "<linker>\n"
+                + "    <assembly fullname=\"B\" preserve=\"nothing\" />\n"
+                + "    <assembly fullname=\"B\">\n"
+                + "        <type fullname=\"B.Foo\" preserve=\"all\" />\n"
+                + "    </assembly>\n"
+                + "</linker>\n";
+
+            FakeProjectTypeSource source = new FakeProjectTypeSource()
+                .Assembly("B", "B.Foo", "B.Bar");
+
+            LinkXmlSyncOutcome outcome = LinkXmlSyncEngine.Sync(xml, source);
+
+            Assert.That(outcome.Changed, Is.True);
+            Assert.That(outcome.SkippedAssemblies, Is.Empty);
+            Assert.That(outcome.Xml, Does.Contain("<assembly fullname=\"B\" preserve=\"nothing\" />"));
+            Assert.That(
+                outcome.Xml,
+                Does.Contain(
+                    "<type fullname=\"B.Foo\" preserve=\"all\" />\n"
+                    + "        <namespace fullname=\"B\" preserve=\"all\" />"));
+        }
+
+        [Test]
+        public void Sync_DuplicateAssembly_AllNarrowed_IsSkipped()
+        {
+            string xml =
+                "<linker>\n"
+                + "    <assembly fullname=\"B\" preserve=\"nothing\" />\n"
+                + "    <assembly fullname=\"B\" preserve=\"fields\" />\n"
+                + "</linker>\n";
+
+            FakeProjectTypeSource source = new FakeProjectTypeSource()
+                .Assembly("B", "B.Foo");
+
+            LinkXmlSyncOutcome outcome = LinkXmlSyncEngine.Sync(xml, source);
+
+            Assert.That(outcome.Changed, Is.False);
+            Assert.That(outcome.SkippedAssemblies, Is.EqualTo(new[] { "B" }));
+        }
+
+        [Test]
+        public void Sync_DuplicateAssembly_ChildCoverageIsAggregated()
+        {
+            string xml =
+                "<linker>\n"
+                + "    <assembly fullname=\"B\">\n"
+                + "        <type fullname=\"B.Foo\" preserve=\"all\" />\n"
+                + "    </assembly>\n"
+                + "    <assembly fullname=\"B\">\n"
+                + "        <type fullname=\"B.Bar\" preserve=\"all\" />\n"
+                + "    </assembly>\n"
+                + "</linker>\n";
+
+            FakeProjectTypeSource source = new FakeProjectTypeSource()
+                .Assembly("B", "B.Foo", "B.Bar");
+
+            LinkXmlSyncOutcome outcome = LinkXmlSyncEngine.Sync(xml, source);
+
+            Assert.That(outcome.Changed, Is.False);
+            Assert.That(outcome.Xml, Is.EqualTo(xml));
         }
 
         [Test]

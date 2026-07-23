@@ -14,16 +14,23 @@ namespace DTech.LinkGuard.Editor.Tests
         public IReadOnlyList<string> AssemblyNames =>
             _assemblies.Keys.OrderBy(n => n, StringComparer.Ordinal).ToList();
 
+        /// <summary>Registers project code, the default for the sync tests.</summary>
         public FakeProjectTypeSource Assembly(string assemblyName, params string[] typeFullnames)
         {
-            _assemblies[assemblyName] = BuildNamespaces(typeFullnames);
-            return this;
+            _projectAssemblies.Add(assemblyName);
+            return ExternalAssembly(assemblyName, typeFullnames);
         }
 
         public FakeProjectTypeSource ProjectAssembly(string assemblyName, params string[] typeFullnames)
         {
-            _projectAssemblies.Add(assemblyName);
             return Assembly(assemblyName, typeFullnames);
+        }
+
+        /// <summary>Registers a plugin, UPM package, SDK, or Unity assembly — anything but project code.</summary>
+        public FakeProjectTypeSource ExternalAssembly(string assemblyName, params string[] typeFullnames)
+        {
+            _assemblies[assemblyName] = BuildNamespaces(typeFullnames);
+            return this;
         }
 
         public bool IsProjectAssembly(string assemblyName)
