@@ -26,6 +26,7 @@ shrinker — the native-side counterpart of `link.xml`.
     - [Profiles](#profiles)
     - [Merge Existing link.xml Files](#merge-existing-linkxml-files)
     - [Validate link.xml](#validate-linkxml)
+    - [Sync New Code Into link.xml](#sync-new-code-into-linkxml)
     - [Custom SDK Groups](#custom-sdk-groups)
     - [Custom Merge Providers](#custom-merge-providers)
     - [Zenject Module](#zenject-module)
@@ -50,9 +51,9 @@ shrinker — the native-side counterpart of `link.xml`.
     ```
 3. Unity will automatically import the package.
 
-If you want to set a target version, Link Guard uses the `v*.*.*` release tag so you can specify a version like #v1.3.1.
+If you want to set a target version, Link Guard uses the `v*.*.*` release tag so you can specify a version like #v1.4.0.
 
-For example `https://github.com/DanilChizhikov/link-guard.git#v1.3.1`.
+For example `https://github.com/DanilChizhikov/link-guard.git#v1.4.0`.
 
 ## Features
 - Assembly scanning for project code, plugins, precompiled DLLs, UPM packages, known SDKs, and Unity modules (precompiled assemblies filtered to those included in the player build)
@@ -65,6 +66,7 @@ For example `https://github.com/DanilChizhikov/link-guard.git#v1.3.1`.
 - Import the current `Assets/link.xml` when the window opens (legacy method-level entries are promoted to whole-type `preserve="all"` with a warning in the Console)
 - Merge existing `link.xml` files from `Assets` and `Packages`
 - Validate the current `Assets/link.xml` against assemblies and types that will be present in the player build
+- Sync the current `Assets/link.xml` with the project code: namespaces and assemblies written after the file was generated are covered again, additively — nothing is ever removed or narrowed, and non-project assemblies are left alone
 - Preserve unknown entries and custom XML attributes when importing or merging
 - `ignoreIfMissing` support for assembly entries
 - Custom SDK grouping through `IKnownSdkProvider`
@@ -145,6 +147,79 @@ internal sealed class LinkXmlValidationBuildHook : IPreprocessBuildWithReport
 `LinkXmlValidationReport` with removed and kept entries. With `apply: true`, stale entries are written back to the
 file. With `throwOnError: true`, a parse failure throws `BuildFailedException`, which aborts the build when called
 from a build callback.
+
+### Sync New Code Into link.xml
+
+A generated `link.xml` goes stale as soon as new code is written: a class added to a namespace that the
+file lists type by type, a brand new namespace, or a whole new assembly is not preserved, and managed
+stripping removes it from the build.
+
+Press `Sync` to add the missing coverage. Link Guard scans the project, compares it against the current
+`Assets/link.xml`, shows what is missing, and writes it only after confirmation.
+
+Sync is strictly additive — existing entries, attributes, comments, and formatting are never removed,
+narrowed, or reordered.
+
+Sync covers **project code**: every namespace of every assembly defined by an asmdef under `Assets`,
+including assemblies link.xml does not mention yet. Plugins, UPM packages, SDKs, and Unity assemblies are
+left alone, so a single hand-written entry for a third-party SDK is never expanded into namespace-wide
+preservation and the build does not grow behind your back.
+
+There is nothing to configure — how each existing entry is read:
+
+| Existing entry | Meaning for sync |
+|---|---|
+| `<assembly preserve="all">`, or `<assembly fullname="A"/>` with no children | whole assembly preserved, skipped |
+| `<assembly fullname="A" preserve="nothing"/>` (any `preserve` other than `all`, no children) | deliberate opt-out: assembly skipped and reported |
+| several `<assembly fullname="A">` elements with the same name | coverage is aggregated across all of them; `preserve="all"` on any of them wins |
+| `<namespace fullname="N" preserve="all"/>` or `<type fullname="N.*" preserve="all"/>` | namespace already covered, skipped |
+| `<type fullname="N.T" preserve="all"/>` | type already covered; the rest of namespace `N` is still synced |
+| `<type fullname="N.T" preserve="fields"/>` and other narrowed entries | deliberate narrowing, namespace `N` is never collapsed |
+
+An uncovered namespace collapses to a single `<namespace fullname="N" preserve="all"/>` entry, which also
+covers every type added to that namespace later. When the namespace contains narrowed entries, or when the
+types have no namespace at all, the missing types are added as explicit `<type preserve="all"/>` entries
+instead so the narrowing is respected. An assembly that link.xml does not list at all is added as
+`<assembly fullname="A">` with one entry per namespace.
+
+Non-project assemblies can still be covered explicitly, with scope patterns:
+
+```csharp
+LinkXmlSyncReport report = LinkXmlSync.Sync(new[] { "Game.*" }, apply: true);
+```
+
+Patterns support `*` and `?` and are matched against both assembly names and namespace names. A pattern
+matching an assembly name preserves that whole assembly. Patterns are an explicit opt-in and apply to
+non-project assemblies too; to sync every non-project assembly the same way project code is synced, pass
+`includeExternalAssemblies: true`.
+
+#### Build-time API (sync)
+For automated pipelines, call sync from a custom build hook or before starting a player build:
+
+```csharp
+using DTech.LinkGuard.Editor;
+using UnityEditor.Build;
+using UnityEditor.Build.Reporting;
+
+internal sealed class LinkXmlSyncBuildHook : IPreprocessBuildWithReport
+{
+    public int callbackOrder => 0;
+
+    public void OnPreprocessBuild(BuildReport report)
+    {
+        LinkXmlSyncReport syncReport = LinkXmlSync.Sync(apply: true, throwOnError: true);
+        UnityEngine.Debug.Log(syncReport);
+    }
+}
+```
+
+`LinkXmlSync.Sync(apply, throwOnError)` reads the current `Assets/link.xml` and returns a
+`LinkXmlSyncReport` with the added assemblies, namespaces, and types, plus the assemblies that were
+skipped because they are explicitly narrowed. With `apply: true`, the added entries are written back to the file. With
+`throwOnError: true`, a read or parse failure throws `BuildFailedException`, which aborts the build when
+called from a build callback. When no `link.xml` exists, nothing is written (`FileExisted` is `false`).
+Repeated runs are idempotent, and sync does not register itself as a build callback — opt in from your
+own build script.
 
 ### Custom SDK Groups
 Link Guard includes built-in SDK patterns for common Unity SDKs. You can add project-specific SDK grouping by
