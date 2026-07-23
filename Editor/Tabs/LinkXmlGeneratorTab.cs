@@ -83,6 +83,7 @@ namespace DTech.LinkGuard.Editor
             ToolbarButton loadBtn = root.Q<ToolbarButton>("btn-load");
             ToolbarButton saveBtn = root.Q<ToolbarButton>("btn-save");
             ToolbarButton validateBtn = root.Q<ToolbarButton>("btn-validate");
+            ToolbarButton syncBtn = root.Q<ToolbarButton>("btn-sync");
             _mergeButtonsHost = root.Q<VisualElement>("merge-buttons");
             _previewToggle = root.Q<ToolbarToggle>("tgl-preview");
             _generateButton = root.Q<ToolbarButton>("btn-generate");
@@ -110,6 +111,7 @@ namespace DTech.LinkGuard.Editor
             loadBtn.clicked += LoadProfileClickedHandler;
             saveBtn.clicked += SaveProfileClickedHandler;
             validateBtn.clicked += ValidateClickedHandler;
+            syncBtn.clicked += SyncClickedHandler;
             _generateButton.clicked += Generate;
 
             BuildMergeButtons();
@@ -345,6 +347,155 @@ namespace DTech.LinkGuard.Editor
 
             builder.AppendLine();
             builder.Append("Remove these entries?");
+
+            return builder.ToString();
+        }
+
+        private void SyncClickedHandler()
+        {
+            if (!File.Exists(LinkXmlWriter.DefaultPath))
+            {
+                EditorUtility.DisplayDialog(Title, $"No link.xml found at {LinkXmlWriter.DefaultPath}.", "OK");
+                return;
+            }
+
+            if (_entries.Count == 0)
+            {
+                Refresh();
+            }
+
+            LinkXmlSyncReport report;
+
+            try
+            {
+                EditorUtility.DisplayProgressBar(Title, "Syncing link.xml with project code...", 0.5f);
+                report = LinkXmlSync.Sync(
+                    new ScannedProjectTypeSource(_entries),
+                    LinkXmlWriter.DefaultPath,
+                    scopePatterns: null,
+                    apply: false,
+                    throwOnError: false);
+            }
+            finally
+            {
+                EditorUtility.ClearProgressBar();
+            }
+
+            if (!report.Success)
+            {
+                EditorUtility.DisplayDialog(
+                    Title, $"link.xml could not be synced: {report.FailureReason}", "OK");
+                return;
+            }
+
+            if (!report.Changed)
+            {
+                string message = "link.xml already covers every project namespace. Nothing to add.";
+
+                if (report.SkippedAssemblies.Count > 0)
+                {
+                    message += $"\n\n{report.SkippedAssemblies.Count} assemblies are explicitly narrowed in "
+                        + "link.xml and were skipped (see Console).";
+                }
+
+                EditorUtility.DisplayDialog(Title, message, "OK");
+                return;
+            }
+
+            if (!EditorUtility.DisplayDialog(Title, BuildSyncSummary(report), "Add", "Cancel"))
+            {
+                return;
+            }
+
+            LinkXmlSync.Apply(report);
+            Refresh();
+        }
+
+        private static string BuildSyncSummary(LinkXmlSyncReport report)
+        {
+            const int maxLines = 12;
+
+            StringBuilder builder = new StringBuilder();
+            builder.AppendLine($"Project code that {report.OutputPath} does not cover yet:");
+
+            int budget = maxLines;
+            int omitted = 0;
+
+            if (report.AddedAssemblies.Count > 0)
+            {
+                builder.AppendLine();
+                builder.AppendLine($"Assemblies to add ({report.AddedAssemblies.Count}):");
+
+                foreach (string assembly in report.AddedAssemblies)
+                {
+                    if (budget <= 0)
+                    {
+                        omitted++;
+                        continue;
+                    }
+
+                    builder.AppendLine($"  + {assembly}");
+                    budget--;
+                }
+            }
+
+            if (report.AddedNamespaceCount > 0)
+            {
+                builder.AppendLine();
+                builder.AppendLine($"Namespaces to preserve ({report.AddedNamespaceCount}):");
+
+                foreach (LinkXmlSyncEntryGroup group in report.AddedNamespaces)
+                {
+                    foreach (string namespaceName in group.Names)
+                    {
+                        if (budget <= 0)
+                        {
+                            omitted++;
+                            continue;
+                        }
+
+                        builder.AppendLine($"  + {group.AssemblyName}: {namespaceName}.*");
+                        budget--;
+                    }
+                }
+            }
+
+            if (report.AddedTypeCount > 0)
+            {
+                builder.AppendLine();
+                builder.AppendLine($"Types to preserve ({report.AddedTypeCount}):");
+
+                foreach (LinkXmlSyncEntryGroup group in report.AddedTypes)
+                {
+                    foreach (string typeName in group.Names)
+                    {
+                        if (budget <= 0)
+                        {
+                            omitted++;
+                            continue;
+                        }
+
+                        builder.AppendLine($"  + {group.AssemblyName}: {typeName}");
+                        budget--;
+                    }
+                }
+            }
+
+            if (omitted > 0)
+            {
+                builder.AppendLine($"  ... and {omitted} more (see Console).");
+            }
+
+            if (report.SkippedAssemblies.Count > 0)
+            {
+                builder.AppendLine();
+                builder.AppendLine(
+                    $"{report.SkippedAssemblies.Count} assemblies are explicitly narrowed in link.xml "
+                    + "and are skipped (see Console).");
+            }
+
+            builder.AppendLine();
+            builder.Append("Add these entries? Nothing is removed.");
 
             return builder.ToString();
         }

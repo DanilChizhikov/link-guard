@@ -9,6 +9,8 @@
             <uie:ToolbarButton name="btn-load" text="Load Profile" class="lxg-tb-btn"/>
             <uie:ToolbarButton name="btn-save" text="Save Profile" class="lxg-tb-btn"/>
             <uie:ToolbarButton name="btn-validate" text="Validate" class="lxg-tb-btn"/>
+            <uie:ToolbarButton name="btn-sync" text="Sync" class="lxg-tb-btn"
+                               tooltip="Add link.xml entries for project code that the file does not cover yet. Never removes existing entries."/>
             <ui:VisualElement class="lxg-tb-flex"/>
             <ui:VisualElement name="merge-buttons" class="lxg-merge-buttons"/>
             <uie:ToolbarToggle name="tgl-preview" text="Preview" class="lxg-tb-btn"/>
